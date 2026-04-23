@@ -134,7 +134,7 @@ class ConsultationControllerTest {
 
     private ConsultationDto buildDto(String status) {
         return new ConsultationDto(
-                UUID.randomUUID(), UUID.randomUUID(),
+                UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
                 UUID.randomUUID().toString(), status,
                 OffsetDateTime.now().minusMinutes(30), OffsetDateTime.now(),
                 30, "Some notes", null, OffsetDateTime.now(), null, OffsetDateTime.now()
