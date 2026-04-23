@@ -27,7 +27,9 @@ jobs:
 
       - name: Build & run tests
         working-directory: SHCP-Backend/patientsMgt
-        run: ./mvnw verify -q
+        run: |
+          chmod +x mvnw
+          ./mvnw verify -q
 
   # ── Notification Consumer ────────────────────────────────────────────────────
   build-notification-consumer:
