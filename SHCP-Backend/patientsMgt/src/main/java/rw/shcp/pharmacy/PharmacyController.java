@@ -1,0 +1,83 @@
+package rw.shcp.pharmacy;
+
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import rw.shcp.common.response.ApiResponse;
+import rw.shcp.pharmacy.dto.AddPharmacistRequest;
+import rw.shcp.pharmacy.dto.CreatePharmacyRequest;
+import rw.shcp.pharmacy.dto.PharmacistProfileDto;
+import rw.shcp.pharmacy.dto.PharmacyDto;
+
+import java.util.List;
+import java.util.UUID;
+
+@RestController
+@RequestMapping("/api/pharmacies")
+@RequiredArgsConstructor
+@Tag(name = "Pharmacies", description = "Pharmacy management")
+public class PharmacyController {
+
+    private final PharmacyService pharmacyService;
+
+    @GetMapping
+    @Operation(summary = "List all active pharmacies (public)")
+    public ResponseEntity<ApiResponse<List<PharmacyDto>>> listActive() {
+        return ResponseEntity.ok(ApiResponse.ok(pharmacyService.listActive()));
+    }
+
+    @GetMapping("/{id}")
+    @Operation(summary = "Get pharmacy by ID (public)")
+    public ResponseEntity<ApiResponse<PharmacyDto>> getById(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.ok(pharmacyService.getById(id)));
+    }
+
+    @PostMapping
+    @Operation(summary = "Create pharmacy (ADMIN only)")
+    public ResponseEntity<ApiResponse<PharmacyDto>> create(
+            @Valid @RequestBody CreatePharmacyRequest req) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.ok(pharmacyService.create(req)));
+    }
+
+    @PutMapping("/{id}")
+    @Operation(summary = "Update pharmacy (ADMIN only)")
+    public ResponseEntity<ApiResponse<PharmacyDto>> update(
+            @PathVariable UUID id,
+            @Valid @RequestBody CreatePharmacyRequest req) {
+        return ResponseEntity.ok(ApiResponse.ok(pharmacyService.update(id, req)));
+    }
+
+    @PatchMapping("/{id}/activate")
+    @Operation(summary = "Activate pharmacy (ADMIN only)")
+    public ResponseEntity<ApiResponse<Void>> activate(@PathVariable UUID id) {
+        pharmacyService.setActive(id, true);
+        return ResponseEntity.ok(ApiResponse.ok(null));
+    }
+
+    @PatchMapping("/{id}/deactivate")
+    @Operation(summary = "Deactivate pharmacy (ADMIN only)")
+    public ResponseEntity<ApiResponse<Void>> deactivate(@PathVariable UUID id) {
+        pharmacyService.setActive(id, false);
+        return ResponseEntity.ok(ApiResponse.ok(null));
+    }
+
+    @GetMapping("/{id}/pharmacists")
+    @Operation(summary = "List pharmacists for a pharmacy (ADMIN only)")
+    public ResponseEntity<ApiResponse<List<PharmacistProfileDto>>> listPharmacists(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.ok(pharmacyService.listPharmacists(id)));
+    }
+
+    @PostMapping("/{id}/pharmacists")
+    @Operation(summary = "Add a pharmacist to a pharmacy (ADMIN only)")
+    public ResponseEntity<ApiResponse<PharmacistProfileDto>> addPharmacist(
+            @PathVariable UUID id,
+            @Valid @RequestBody AddPharmacistRequest req) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.ok(pharmacyService.addPharmacist(id, req)));
+    }
+}

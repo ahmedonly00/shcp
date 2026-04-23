@@ -1,0 +1,64 @@
+spring:
+  application:
+    name: shcp-notification-consumer
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/shcp_db}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:ahmed@2018}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate           # Consumer never creates/alters schema — that's the API's job
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+    open-in-view: false
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:shcp}
+    password: ${RABBITMQ_PASS:ahmed@2018}
+    listener:
+      simple:
+        acknowledge-mode: auto
+
+# ── Mail (SMTP) ───────────────────────────────────────────────────────────────
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:ahmedndayizeye46@gmail.com}
+    password: ${MAIL_PASSWORD:hlfepyeiszttczas}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+
+mail:
+  from-name: ${MAIL_FROM_NAME:SHCP Health Platform}
+
+# ── Provider credentials ──────────────────────────────────────────────────────
+shcp:
+  fcm:
+    credentials-path: ${FCM_CREDENTIALS_PATH:../secrets/fcm-credentials.json}
+
+# ── Actuator health (Docker HEALTHCHECK) ─────────────────────────────────────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  server:
+    port: 8081
+
+server:
+  port: 8081
+
+logging:
+  level:
+    rw.shcp.consumer: INFO

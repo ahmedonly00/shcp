@@ -1,0 +1,48 @@
+# Secrets — never commit
+.env
+.env.local
+.env.*.local
+secrets/
+
+# Java
+target/
+*.class
+*.jar
+*.war
+*.ear
+.mvn/wrapper/maven-wrapper.jar
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.venv/
+venv/
+dist/
+*.egg-info/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# Frontend build
+dist/
+build/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+*.override.yml
+
+# Trained ML model binaries (regenerated during Docker build)
+ai-service/models/*.pkl

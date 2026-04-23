@@ -1,0 +1,193 @@
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --font-size: 16px;
+  --background: #F5F9FB;
+  --foreground: #1a1a1a;
+  --card: #ffffff;
+  --card-foreground: #1a1a1a;
+  --popover: #ffffff;
+  --popover-foreground: #1a1a1a;
+  /* Primary color matching Healthiqo brand */
+  --primary: #005A87;
+  --primary-foreground: #ffffff;
+  /* Secondary light blue matching homepage background */
+  --secondary: #D4E8F0;
+  --secondary-foreground: #005A87;
+  --muted: #E8F4F8;
+  --muted-foreground: #64748b;
+  --accent: #B8D9E8;
+  --accent-foreground: #005A87;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --border: rgba(0, 90, 135, 0.15);
+  --input: transparent;
+  --input-background: #ffffff;
+  --switch-background: #94C4DC;
+  --font-weight-medium: 600;
+  --font-weight-normal: 400;
+  --ring: #005A87;
+  /* Updated chart colors to match health theme */
+  --chart-1: #005A87;
+  --chart-2: #0088CC;
+  --chart-3: #4FADDA;
+  --chart-4: #7BC8E8;
+  --chart-5: #A8DBF0;
+  --radius: 0.75rem;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #1a1a1a;
+  --sidebar-primary: #005A87;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #D4E8F0;
+  --sidebar-accent-foreground: #005A87;
+  --sidebar-border: rgba(0, 90, 135, 0.1);
+  --sidebar-ring: #005A87;
+}
+
+.dark {
+  --background: #0a1929;
+  --foreground: #f1f5f9;
+  --card: #132f4c;
+  --card-foreground: #f1f5f9;
+  --popover: #132f4c;
+  --popover-foreground: #f1f5f9;
+  --primary: #0088CC;
+  --primary-foreground: #ffffff;
+  --secondary: #1e3a52;
+  --secondary-foreground: #B8D9E8;
+  --muted: #1e3a52;
+  --muted-foreground: #94a3b8;
+  --accent: #1e3a52;
+  --accent-foreground: #B8D9E8;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --border: rgba(0, 136, 204, 0.2);
+  --input: rgba(0, 136, 204, 0.2);
+  --ring: #0088CC;
+  --font-weight-medium: 600;
+  --font-weight-normal: 400;
+  --chart-1: #0088CC;
+  --chart-2: #4FADDA;
+  --chart-3: #7BC8E8;
+  --chart-4: #A8DBF0;
+  --chart-5: #D4E8F0;
+  --sidebar: #0a1929;
+  --sidebar-foreground: #f1f5f9;
+  --sidebar-primary: #0088CC;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #1e3a52;
+  --sidebar-accent-foreground: #B8D9E8;
+  --sidebar-border: rgba(0, 136, 204, 0.2);
+  --sidebar-ring: #0088CC;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-input-background: var(--input-background);
+  --color-switch-background: var(--switch-background);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    font-size: var(--font-size);
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Typography scale — tight headings read clearly on projectors and screens */
+  h1 {
+    font-size: var(--text-2xl);
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+  }
+
+  h2 {
+    font-size: var(--text-xl);
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: -0.015em;
+  }
+
+  h3 {
+    font-size: var(--text-lg);
+    font-weight: 600;
+    line-height: 1.3;
+    letter-spacing: -0.01em;
+  }
+
+  h4 {
+    font-size: var(--text-base);
+    font-weight: 600;
+    line-height: 1.4;
+  }
+
+  p {
+    line-height: 1.6;
+  }
+
+  label {
+    font-size: var(--text-sm);
+    font-weight: 500;
+    line-height: 1.4;
+  }
+
+  button {
+    font-size: var(--text-base);
+    font-weight: 500;
+    line-height: 1.5;
+    letter-spacing: -0.01em;
+  }
+
+  input, textarea, select {
+    font-family: inherit;
+    font-size: var(--text-base);
+    font-weight: var(--font-weight-normal);
+    line-height: 1.5;
+  }
+}

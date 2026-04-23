@@ -1,0 +1,259 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# SHCP – production Docker Compose
+#
+# Required .env variables:
+#   DB_PASSWORD, JWT_SECRET, RABBITMQ_PASS, REDIS_PASSWORD
+#   MAIL_USERNAME, MAIL_PASSWORD
+#   COTURN_SECRET, COTURN_EXTERNAL_IP   ← public IP of your VPS/cloud host
+#   VITE_API_BASE_URL, VITE_SIGNALING_URL  ← public URLs for the React bundle
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ─────────────────────────────────────────────
+  # React / Vite frontend (nginx)
+  # ─────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./SHCP-Frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080}
+        VITE_SIGNALING_URL: ${VITE_SIGNALING_URL:-http://localhost:3001}
+        VITE_GOOGLE_FIT_CLIENT_ID: ${VITE_GOOGLE_FIT_CLIENT_ID:-}
+    container_name: shcp-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - shcp-net
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────────
+  # Spring Boot Core API
+  # ─────────────────────────────────────────────
+  api:
+    build:
+      context: ./SHCP-Backend/patientsMgt
+      dockerfile: Dockerfile
+    container_name: shcp-api
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/shcp_db
+      DB_USERNAME: postgres
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      AI_SERVICE_URL: http://ai-service:5000
+      ALLOWED_ORIGINS: ${FRONTEND_URL:-http://localhost}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: shcp
+      RABBITMQ_PASS: ${RABBITMQ_PASS}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      FIREBASE_CREDENTIALS_PATH: /run/secrets/fcm-credentials.json
+      COTURN_SECRET: ${COTURN_SECRET}
+      COTURN_HOST: ${COTURN_EXTERNAL_IP:-coturn}
+      COTURN_PORT: ${COTURN_PORT:-3478}
+      COTURN_TLS_PORT: ${COTURN_TLS_PORT:-5349}
+      COTURN_REALM: ${COTURN_REALM:-shcp.rw}
+    volumes:
+      - ./secrets/fcm-credentials.json:/run/secrets/fcm-credentials.json:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - shcp-net
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────────
+  # Python Flask AI Microservice
+  # ─────────────────────────────────────────────
+  ai-service:
+    build:
+      context: ./ai-service
+      dockerfile: Dockerfile
+    container_name: shcp-ai
+    # Port 5000 is intentionally not exposed to the host — only the api service
+    # calls it over the internal shcp-net network.
+    environment:
+      FLASK_ENV: production
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - shcp-net
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────────
+  # Node.js WebRTC Signaling Server
+  # ─────────────────────────────────────────────
+  signaling:
+    build:
+      context: ./signaling
+      dockerfile: Dockerfile
+    container_name: shcp-signaling
+    ports:
+      - "3001:3001"
+    environment:
+      PORT: 3001
+      JWT_SECRET: ${JWT_SECRET}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
+      API_ORIGIN: http://api:8080
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - shcp-net
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────────
+  # coturn TURN relay server
+  # ─────────────────────────────────────────────
+  coturn:
+    image: coturn/coturn:latest
+    container_name: shcp-coturn
+    network_mode: host          # TURN relay needs host networking for UDP port mapping
+    environment:
+      COTURN_EXTERNAL_IP: ${COTURN_EXTERNAL_IP}
+    volumes:
+      - ./coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
+    # external-ip and relay-ip are passed as CLI args so they can come from .env
+    command: >-
+      -c /etc/coturn/turnserver.conf
+      --external-ip=${COTURN_EXTERNAL_IP}
+      --relay-ip=${COTURN_EXTERNAL_IP}
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────────
+  # Redis 7 (refresh tokens, availability cache, rate limiting)
+  # ─────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: shcp-redis
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    # Port 6379 is intentionally not exposed to the host.
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - shcp-net
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────────
+  # RabbitMQ 3.13 Message Broker
+  # ─────────────────────────────────────────────
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: shcp-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: shcp
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}
+    # AMQP port 5672 is internal-only. Management UI (15672) is not exposed
+    # to the host in production — access via SSH tunnel if needed.
+    volumes:
+      - rabbitmqdata:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - shcp-net
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────────
+  # Spring Boot Notification Consumer
+  # ─────────────────────────────────────────────
+  notification-consumer:
+    build:
+      context: ./notification-consumer
+      dockerfile: Dockerfile
+    container_name: shcp-notifications
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/shcp_db
+      DB_USERNAME: postgres
+      DB_PASSWORD: ${DB_PASSWORD}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: shcp
+      RABBITMQ_PASS: ${RABBITMQ_PASS}
+      MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      FCM_CREDENTIALS_PATH: /run/secrets/fcm-credentials.json
+    volumes:
+      - ./secrets/fcm-credentials.json:/run/secrets/fcm-credentials.json:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8081/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - shcp-net
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────────
+  # PostgreSQL 15
+  # ─────────────────────────────────────────────
+  db:
+    image: postgres:15-alpine
+    container_name: shcp-db
+    environment:
+      POSTGRES_DB: shcp_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # Port 5432 is intentionally not exposed to the host in production.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d shcp_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - shcp-net
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:
+  rabbitmqdata:
+
+networks:
+  shcp-net:
+    driver: bridge
