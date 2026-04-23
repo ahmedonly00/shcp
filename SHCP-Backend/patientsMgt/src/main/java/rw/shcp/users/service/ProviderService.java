@@ -215,6 +215,24 @@ public class ProviderService {
         return HealthRecordDto.from(ehr);
     }
 
+    // ── Instant availability ──────────────────────────────────
+
+    public List<InstantAvailableProviderDto> getInstantAvailableProviders() {
+        return providerRepository.findByIsAvailableForInstantTrueAndIsActiveTrue()
+                .stream()
+                .map(InstantAvailableProviderDto::from)
+                .toList();
+    }
+
+    @Transactional
+    @PreAuthorize("hasRole('PROVIDER')")
+    public ProviderProfileDto toggleInstantAvailability(UUID providerId) {
+        Provider provider = findProviderOrThrow(providerId);
+        provider.setAvailableForInstant(!provider.isAvailableForInstant());
+        providerRepository.save(provider);
+        return ProviderProfileDto.from(provider);
+    }
+
     // ── Helpers ───────────────────────────────────────────────
 
     private Provider findProviderOrThrow(UUID userId) {

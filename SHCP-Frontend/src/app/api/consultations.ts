@@ -30,7 +30,19 @@ export interface AuditEventDto {
   createdAt: string;
 }
 
+export interface InstantConsultRequest {
+  providerId: string;
+  notes?: string;
+}
+
 export const consultationsApi = {
+  // ── Instant consult (patient-initiated) ─────────────────────────────────────
+  startInstant: (data: InstantConsultRequest) =>
+    apiClient.post<ApiConsultationDto>('/consultations/instant', data).then(unwrap<ApiConsultationDto>),
+
+  getIncomingInstant: () =>
+    apiClient.get<ApiConsultationDto | null>('/consultations/instant-incoming').then(unwrap<ApiConsultationDto | null>),
+
   start: (data: StartConsultationRequest) =>
     apiClient.post<ApiConsultationDto>('/consultations', data).then(unwrap<ApiConsultationDto>),
 

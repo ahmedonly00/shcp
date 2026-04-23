@@ -8,7 +8,7 @@ import { Textarea } from '@/app/components/ui/textarea';
 import {
   Video, VideoOff, Mic, MicOff, PhoneOff, MessageSquare,
   FileText, Clock, User, Maximize, Loader2, WifiOff, Calendar as CalendarIcon, Monitor, MonitorOff,
-  Circle, Square, Send
+  Circle, Square, Send, Zap, Star, Building2, ChevronLeft, ToggleLeft, ToggleRight
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
@@ -16,7 +16,7 @@ import { consultationsApi } from '@/app/api/consultations';
 import { patientsApi } from '@/app/api/patients';
 import { providersApi } from '@/app/api/providers';
 import { referralsApi } from '@/app/api/referrals';
-import { ApiConsultationDto, ApiHealthRecordDto, ApiSymptomReport, Appointment, mapApiAppointment, isAppointmentExpired } from '@/app/types';
+import { ApiConsultationDto, ApiHealthRecordDto, ApiInstantAvailableProvider, ApiSymptomReport, Appointment, mapApiAppointment, isAppointmentExpired } from '@/app/types';
 import { useAuth } from '@/app/context/AuthContext';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/app/components/ui/dialog';
 
@@ -118,6 +118,16 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
   const [showConsentDialog, setShowConsentDialog] = useState(false);
   const [activeTab, setActiveTab] = useState<'chat' | 'patient' | 'referral'>('chat');
 
+  // ── Instant consult state ─────────────────────────────────────────────────
+  const [showInstantPanel, setShowInstantPanel] = useState(false);
+  const [instantProviders, setInstantProviders] = useState<ApiInstantAvailableProvider[]>([]);
+  const [loadingInstantProviders, setLoadingInstantProviders] = useState(false);
+  const [startingInstant, setStartingInstant] = useState(false);
+  const [instantAvailable, setInstantAvailable] = useState<boolean | null>(null);
+  const [togglingInstant, setTogglingInstant] = useState(false);
+  const [incomingInstant, setIncomingInstant] = useState<ApiConsultationDto | null>(null);
+  const instantPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   // ── Waiting room (provider side) ──────────────────────────────────────────
   const [waitingPatients, setWaitingPatients] = useState<WaitingPatient[]>([]);
 
@@ -171,8 +181,35 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
   useEffect(() => {
     return () => {
       cleanup(false);
+      if (instantPollRef.current) clearInterval(instantPollRef.current);
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Load provider's instant availability status — refresh each time they return to waiting phase
+  useEffect(() => {
+    if (!isProvider || phase !== 'waiting') return;
+    providersApi.getMyProfile()
+      .then(p => setInstantAvailable(p.isAvailableForInstant ?? false))
+      .catch(() => {});
+  }, [isProvider, phase]);
+
+  // Poll for incoming instant consultation requests when provider is available
+  useEffect(() => {
+    if (!isProvider || !instantAvailable || phase !== 'waiting') {
+      if (instantPollRef.current) { clearInterval(instantPollRef.current); instantPollRef.current = null; }
+      setIncomingInstant(null);
+      return;
+    }
+    const poll = async () => {
+      try {
+        const c = await consultationsApi.getIncomingInstant();
+        setIncomingInstant(c);
+      } catch { /* ignore */ }
+    };
+    poll();
+    instantPollRef.current = setInterval(poll, 8000);
+    return () => { if (instantPollRef.current) clearInterval(instantPollRef.current); };
+  }, [isProvider, instantAvailable, phase]);
 
   // Sync local stream → video element whenever either becomes available
   useEffect(() => {
@@ -641,6 +678,67 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
     }
   };
 
+  // ─── Instant consult helpers ───────────────────────────────────────────────
+
+  const loadInstantProviders = async () => {
+    setLoadingInstantProviders(true);
+    try {
+      const list = await providersApi.getInstantAvailable();
+      setInstantProviders(list ?? []);
+    } catch {
+      toast.error('Could not load available providers');
+    } finally {
+      setLoadingInstantProviders(false);
+    }
+  };
+
+  const startInstantConsult = async (providerId: string) => {
+    setStartingInstant(true);
+    try {
+      updatePhase('connecting');
+      const consultation = await consultationsApi.startInstant({ providerId });
+      consultationRef.current = consultation;
+      iceConfigRef.current = await fetchIceServers(consultation.consultationId);
+      await getUserMedia();
+      connectSocket(consultation.roomId);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to start instant consultation';
+      toast.error(msg);
+      updatePhase('waiting');
+    } finally {
+      setStartingInstant(false);
+    }
+  };
+
+  const joinInstantConsult = async (consultation: ApiConsultationDto) => {
+    updatePhase('connecting');
+    try {
+      consultationRef.current = consultation;
+      iceConfigRef.current = await fetchIceServers(consultation.consultationId);
+      await getUserMedia();
+      connectSocket(consultation.roomId);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to join instant consultation';
+      toast.error(msg);
+      updatePhase('waiting');
+    }
+  };
+
+  const toggleInstantAvailability = async () => {
+    setTogglingInstant(true);
+    try {
+      const updated = await providersApi.toggleInstantAvailability();
+      setInstantAvailable(updated.isAvailableForInstant ?? false);
+      toast.success(updated.isAvailableForInstant
+        ? 'You are now available for instant consultations'
+        : 'You are no longer available for instant consultations');
+    } catch {
+      toast.error('Could not update instant availability');
+    } finally {
+      setTogglingInstant(false);
+    }
+  };
+
   // ─── Main join flow ────────────────────────────────────────────────────────
 
   const joinConsultation = async () => {
@@ -918,7 +1016,8 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
   // ─── Referral submission ──────────────────────────────────────────────────
 
   const handleSendReferral = async () => {
-    if (!appointment?.patientId) { toast.error('No patient in this consultation'); return; }
+    const patientId = appointment?.patientId ?? consultationRef.current?.patientId;
+    if (!patientId) { toast.error('No patient in this consultation'); return; }
     if (!referralSpecialtyNeeded.trim()) { toast.error('Specialty / treatment area is required'); return; }
     if (!referralReason.trim()) { toast.error('Reason is required'); return; }
     if (referralType === 'EXTERNAL' && !referralInstitutionName.trim()) {
@@ -927,7 +1026,7 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
     setSubmittingReferral(true);
     try {
       await referralsApi.create({
-        patientId: appointment.patientId,
+        patientId: patientId,
         consultationId: consultationRef.current?.consultationId,
         specialtyNeeded: referralSpecialtyNeeded,
         reason: referralReason,
@@ -998,8 +1097,239 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
   // ─── Render: Waiting Room ─────────────────────────────────────────────────
 
   if (phase === 'waiting') {
+    // ── Provider: Instant consult panel ──────────────────────────────────────
+    if (isProvider) {
+      return (
+        <div className="space-y-4">
+          {/* Instant availability toggle */}
+          <Card>
+            <CardContent className="pt-5 pb-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`h-10 w-10 rounded-full flex items-center justify-center ${instantAvailable ? 'bg-green-100' : 'bg-gray-100'}`}>
+                    <Zap className={`h-5 w-5 ${instantAvailable ? 'text-green-600' : 'text-gray-400'}`} />
+                  </div>
+                  <div>
+                    <p className="font-medium text-sm">Instant Consultation</p>
+                    <p className="text-xs text-muted-foreground">
+                      {instantAvailable ? 'Patients can reach you right now' : 'You are not accepting instant calls'}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={toggleInstantAvailability}
+                  disabled={togglingInstant || instantAvailable === null}
+                  className={instantAvailable ? 'border-green-300 text-green-700 hover:bg-green-50' : ''}
+                >
+                  {togglingInstant ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : instantAvailable ? (
+                    <><ToggleRight className="h-4 w-4 mr-1" /> Available</>
+                  ) : (
+                    <><ToggleLeft className="h-4 w-4 mr-1" /> Go Available</>
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Incoming instant request banner */}
+          {incomingInstant && (
+            <Card className="border-green-400 bg-green-50">
+              <CardContent className="pt-4 pb-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-green-200 flex items-center justify-center animate-pulse">
+                      <Zap className="h-5 w-5 text-green-700" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-green-900 text-sm">Incoming Instant Consultation</p>
+                      <p className="text-xs text-green-700">A patient is waiting for you right now</p>
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    className="bg-green-600 hover:bg-green-700 text-white shrink-0"
+                    onClick={() => joinInstantConsult(incomingInstant)}
+                  >
+                    <Video className="h-4 w-4 mr-1" />
+                    Join Now
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Regular appointment picker */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">{t('teleconsultation.waitingRoom')}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <h3 className="font-semibold mb-1">
+                    {appointment ? `Consultation with ${appointment.patientName}` : 'Scheduled Appointments'}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">{appointment ? 'Click below to start' : 'Select an appointment to begin'}</p>
+                </div>
+
+                {!appointment && (
+                  <div className="space-y-2">
+                    {loadingAppointments ? (
+                      <div className="flex justify-center py-4"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground/70" /></div>
+                    ) : myAppointments.length === 0 ? (
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-sm text-yellow-800">
+                        No upcoming or in-progress appointments found.
+                      </div>
+                    ) : (
+                      myAppointments.map(apt => (
+                        <button key={apt.id} onClick={() => setActiveAppointment(apt)}
+                          className="w-full text-left border rounded-lg p-3 hover:bg-blue-50 hover:border-blue-300 transition-colors">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="font-medium text-sm">{apt.patientName}</p>
+                              <p className="text-xs text-muted-foreground">{apt.date} at {apt.time}</p>
+                            </div>
+                            <Badge variant={apt.status === 'in-progress' ? 'default' : 'secondary'} className="text-xs capitalize ml-2">{apt.status}</Badge>
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+
+                {appointment && (
+                  <>
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-medium text-sm">Appointment Details</h4>
+                        <button onClick={() => setActiveAppointment(undefined)} className="text-xs text-muted-foreground hover:underline">Change</button>
+                      </div>
+                      <div className="space-y-1 text-sm text-foreground/80">
+                        <p><strong>Patient:</strong> {appointment.patientName}</p>
+                        <p><strong>Scheduled:</strong> {appointment.date} at {appointment.time}</p>
+                        <p><strong>Status:</strong> <span className="capitalize">{appointment.status}</span></p>
+                      </div>
+                    </div>
+                    {!isAppointmentExpired(appointment) && (
+                      <Button className="w-full" onClick={joinConsultation}>
+                        <CalendarIcon className="h-4 w-4 mr-2" />
+                        Start Consultation
+                      </Button>
+                    )}
+                  </>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+
+    // ── Patient: Instant consult panel ────────────────────────────────────────
+    if (showInstantPanel) {
+      return (
+        <div className="space-y-4">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setShowInstantPanel(false)} className="text-muted-foreground hover:text-foreground">
+                  <ChevronLeft className="h-5 w-5" />
+                </button>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Zap className="h-4 w-4 text-yellow-500" />
+                  Talk Now — Available Doctors
+                </CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {loadingInstantProviders ? (
+                <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground/70" /></div>
+              ) : instantProviders.length === 0 ? (
+                <div className="text-center py-8 space-y-3">
+                  <div className="h-16 w-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto">
+                    <User className="h-8 w-8 text-gray-400" />
+                  </div>
+                  <p className="font-medium text-gray-600">No doctors available right now</p>
+                  <p className="text-sm text-muted-foreground">All instant-consult doctors are busy. Try booking a scheduled slot.</p>
+                  <Button variant="outline" size="sm" onClick={loadInstantProviders}>
+                    <Loader2 className="h-3 w-3 mr-1" /> Refresh
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {instantProviders.map(p => (
+                    <div key={p.providerId} className="border rounded-lg p-4 flex items-center justify-between gap-4 hover:border-blue-300 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                          <User className="h-5 w-5 text-blue-600" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-sm">{p.name}</p>
+                          <p className="text-xs text-muted-foreground">{p.specialty}</p>
+                          {p.facility && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                              <Building2 className="h-3 w-3" />{p.facility}
+                            </p>
+                          )}
+                          {p.rating != null && (
+                            <p className="text-xs text-yellow-600 flex items-center gap-1 mt-0.5">
+                              <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />{Number(p.rating).toFixed(1)}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                        <Button
+                          size="sm"
+                          onClick={() => startInstantConsult(p.providerId)}
+                          disabled={startingInstant}
+                          className="bg-green-600 hover:bg-green-700 text-white"
+                        >
+                          {startingInstant ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Zap className="h-3 w-3 mr-1" />Connect</>}
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+
+    // ── Patient: Default waiting room ─────────────────────────────────────────
     return (
       <div className="space-y-6">
+        {/* Talk Now banner */}
+        <Card className="border-yellow-300 bg-gradient-to-r from-yellow-50 to-orange-50">
+          <CardContent className="pt-5 pb-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="h-12 w-12 rounded-full bg-yellow-200 flex items-center justify-center">
+                  <Zap className="h-6 w-6 text-yellow-700" />
+                </div>
+                <div>
+                  <p className="font-semibold text-sm">Need help right now?</p>
+                  <p className="text-xs text-muted-foreground">Connect instantly with an available doctor — no appointment needed.</p>
+                </div>
+              </div>
+              <Button
+                className="bg-yellow-500 hover:bg-yellow-600 text-white shrink-0"
+                onClick={() => { setShowInstantPanel(true); loadInstantProviders(); }}
+              >
+                <Zap className="h-4 w-4 mr-1" />
+                Talk Now
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle>{t('teleconsultation.waitingRoom')}</CardTitle>
@@ -1014,12 +1344,11 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
 
               <div>
                 <h3 className="text-xl font-semibold mb-2">
-                  {appointment ? `Consultation with ${isProvider ? appointment.patientName : appointment.doctorName}` : 'Video Consultation'}
+                  {appointment ? `Consultation with ${appointment.doctorName}` : 'Scheduled Consultation'}
                 </h3>
                 <p className="text-muted-foreground">{appointment ? 'Click below to join when you are ready' : 'Select an appointment to join'}</p>
               </div>
 
-              {/* Appointment picker when none selected */}
               {!appointment && (
                 <div className="w-full max-w-md mx-auto text-left space-y-2">
                   {loadingAppointments ? (
@@ -1037,7 +1366,7 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
                       >
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="font-medium text-sm">{isProvider ? apt.patientName : apt.doctorName}</p>
+                            <p className="font-medium text-sm">{apt.doctorName}</p>
                             <p className="text-xs text-muted-foreground">{apt.date} at {apt.time}</p>
                           </div>
                           <Badge variant={apt.status === 'in-progress' ? 'default' : 'secondary'} className="text-xs capitalize ml-2">
@@ -1057,9 +1386,7 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
                     <button onClick={() => setActiveAppointment(undefined)} className="text-xs text-muted-foreground hover:underline">Change</button>
                   </div>
                   <div className="space-y-1 text-sm text-foreground/80">
-                    {isProvider
-                      ? <p><strong>Patient:</strong> {appointment.patientName}</p>
-                      : <p><strong>Doctor:</strong> {appointment.doctorName}</p>}
+                    <p><strong>Doctor:</strong> {appointment.doctorName}</p>
                     {appointment.doctorSpecialization && (
                       <p><strong>Specialization:</strong> {appointment.doctorSpecialization}</p>
                     )}
@@ -1070,10 +1397,7 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
               )}
 
               {appointment && (() => {
-                // Use shared expiry logic — past date = immediately expired,
-                // today = expired after 30-min grace, NO_SHOW = always expired.
                 const isExpired = isAppointmentExpired(appointment);
-
                 if (isExpired) {
                   return (
                     <div className="max-w-md mx-auto bg-red-50 border border-red-200 rounded-lg p-5 text-center space-y-2">
@@ -1090,28 +1414,21 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
                     </div>
                   );
                 }
-
                 return (
                   <>
                     <div className="flex gap-3 justify-center">
-                      <Button
-                        variant={videoEnabled ? 'default' : 'outline'}
-                        onClick={() => setVideoEnabled(v => !v)}
-                      >
+                      <Button variant={videoEnabled ? 'default' : 'outline'} onClick={() => setVideoEnabled(v => !v)}>
                         {videoEnabled ? <Video className="h-4 w-4 mr-2" /> : <VideoOff className="h-4 w-4 mr-2" />}
                         {videoEnabled ? 'Camera On' : 'Camera Off'}
                       </Button>
-                      <Button
-                        variant={audioEnabled ? 'default' : 'outline'}
-                        onClick={() => setAudioEnabled(a => !a)}
-                      >
+                      <Button variant={audioEnabled ? 'default' : 'outline'} onClick={() => setAudioEnabled(a => !a)}>
                         {audioEnabled ? <Mic className="h-4 w-4 mr-2" /> : <MicOff className="h-4 w-4 mr-2" />}
                         {audioEnabled ? 'Mic On' : 'Mic Off'}
                       </Button>
                     </div>
                     <Button size="lg" onClick={joinConsultation}>
                       <CalendarIcon className="h-4 w-4 mr-2" />
-                      {isProvider ? 'Start Consultation' : 'Join Consultation'}
+                      Join Consultation
                     </Button>
                   </>
                 );

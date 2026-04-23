@@ -8,6 +8,7 @@ import java.util.UUID;
 public record ConsultationDto(
         UUID   consultationId,
         UUID   appointmentId,
+        UUID   patientId,
         String roomId,
         String status,
         OffsetDateTime startedAt,
@@ -23,6 +24,7 @@ public record ConsultationDto(
         return new ConsultationDto(
                 c.getConsultationId(),
                 c.getAppointment().getAppointmentId(),
+                c.getAppointment().getPatient().getUserId(),
                 c.getRoomId(),
                 c.getStatus().name(),
                 c.getStartedAt(),

@@ -10,6 +10,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import rw.shcp.common.response.ApiResponse;
@@ -30,6 +31,23 @@ public class ConsultationController {
     private final ConsultationService consultationService;
 
     // ── Core lifecycle ────────────────────────────────────────────────────────
+
+    @PostMapping("/instant")
+    @Operation(summary = "Start an instant consultation now (PATIENT only — no pre-booked slot required)")
+    public ResponseEntity<ApiResponse<ConsultationDto>> startInstant(
+            @Valid @RequestBody InstantConsultRequest req) {
+        UUID patientId = SecurityUtils.currentUserId();
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.ok(consultationService.startInstant(patientId, req)));
+    }
+
+    @GetMapping("/instant-incoming")
+    @PreAuthorize("hasRole('PROVIDER')")
+    @Operation(summary = "Get the active incoming instant consultation for this provider (PROVIDER only)")
+    public ResponseEntity<ApiResponse<ConsultationDto>> getIncomingInstant() {
+        UUID providerId = SecurityUtils.currentUserId();
+        return ResponseEntity.ok(ApiResponse.ok(consultationService.getIncomingInstant(providerId)));
+    }
 
     @PostMapping
     @Operation(summary = "Start a consultation (PROVIDER only)")

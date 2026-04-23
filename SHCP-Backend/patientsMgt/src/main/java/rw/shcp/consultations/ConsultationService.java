@@ -10,6 +10,7 @@ import org.springframework.web.multipart.MultipartFile;
 import rw.shcp.appointments.Appointment;
 import rw.shcp.appointments.AppointmentRepository;
 import rw.shcp.common.enums.AppointmentStatus;
+import rw.shcp.common.enums.AppointmentType;
 import rw.shcp.common.enums.ConsultationStatus;
 import rw.shcp.common.enums.Role;
 import rw.shcp.common.exception.AppException;
@@ -17,6 +18,10 @@ import rw.shcp.common.storage.FileStorageService;
 import rw.shcp.consultations.dto.*;
 import rw.shcp.notifications.NotificationEvent;
 import rw.shcp.notifications.NotificationPublisher;
+import rw.shcp.users.model.Patient;
+import rw.shcp.users.model.Provider;
+import rw.shcp.users.repository.PatientRepository;
+import rw.shcp.users.repository.ProviderRepository;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -41,6 +46,8 @@ public class ConsultationService {
     private final AppointmentRepository            appointmentRepository;
     private final NotificationPublisher            notificationPublisher;
     private final FileStorageService               fileStorageService;
+    private final PatientRepository                patientRepository;
+    private final ProviderRepository               providerRepository;
 
     @Value("${coturn.secret:changeme}")
     private String coturnSecret;
@@ -101,6 +108,85 @@ public class ConsultationService {
                 "Your consultation has started. Join room: " + saved.getRoomId());
 
         return ConsultationDto.from(saved);
+    }
+
+    // ── Instant consult (patient-initiated, no pre-booked slot) ──────────────
+
+    @Transactional
+    @PreAuthorize("hasRole('PATIENT')")
+    public ConsultationDto startInstant(UUID patientUserId, InstantConsultRequest req) {
+        Patient patient = patientRepository.findById(patientUserId)
+                .orElseThrow(() -> AppException.notFound("Patient profile not found"));
+
+        Provider provider = providerRepository.findById(req.providerId())
+                .orElseThrow(() -> AppException.notFound("Provider not found"));
+
+        if (!provider.isActive()) {
+            throw AppException.badRequest("This provider is not currently accepting appointments");
+        }
+
+        // Atomically claim the slot — prevents two patients from booking the same provider concurrently
+        int claimed = providerRepository.claimInstantSlot(req.providerId());
+        if (claimed == 0) {
+            throw AppException.badRequest("This provider is not available for instant consultations right now");
+        }
+
+        // Re-fetch provider after update so the entity reflects the committed state
+        provider = providerRepository.findById(req.providerId())
+                .orElseThrow(() -> AppException.notFound("Provider not found"));
+
+        Appointment appointment = new Appointment();
+        appointment.setPatient(patient);
+        appointment.setProvider(provider);
+        appointment.setScheduledAt(OffsetDateTime.now());
+        appointment.setType(AppointmentType.INSTANT);
+        appointment.setStatus(AppointmentStatus.IN_PROGRESS);
+        if (req.notes() != null) appointment.setNotes(req.notes());
+
+        Appointment savedAppointment = appointmentRepository.save(appointment);
+
+        Consultation consultation = new Consultation();
+        consultation.setAppointment(savedAppointment);
+        consultation.setRoomId(UUID.randomUUID().toString());
+        consultation.setStartedAt(OffsetDateTime.now());
+        consultation.setStatus(ConsultationStatus.IN_PROGRESS);
+
+        Consultation saved = consultationRepository.save(consultation);
+        log.info("Instant consultation {} started: patient={} provider={} room={}",
+                saved.getConsultationId(), patientUserId, req.providerId(), saved.getRoomId());
+
+        writeAuditEvent(saved.getConsultationId(), saved.getRoomId(),
+                AuditEventTypes.CALL_STARTED, patientUserId, "PATIENT", null,
+                "{\"instant\":true}");
+
+        // Notify provider
+        Map<String, Object> meta = Map.of(
+                "consultationId", saved.getConsultationId().toString(),
+                "roomId",         saved.getRoomId(),
+                "appointmentId",  savedAppointment.getAppointmentId().toString(),
+                "patientName",    patient.getUser().getName()
+        );
+        notificationPublisher.publish(NotificationEvent.push(
+                provider.getUserId(), "instant.consult.request",
+                patient.getUser().getName() + " is requesting an instant consultation. Join now.",
+                meta));
+        notificationPublisher.publish(NotificationEvent.email(
+                provider.getUserId(), "instant.consult.request",
+                patient.getUser().getName() + " is requesting an instant consultation. Join now.",
+                meta));
+
+        return ConsultationDto.from(saved);
+    }
+
+    // ── Get incoming instant consult for provider ─────────────────────────────
+
+    @PreAuthorize("hasRole('PROVIDER')")
+    public ConsultationDto getIncomingInstant(UUID providerUserId) {
+        return consultationRepository.findIncomingInstantByProviderId(providerUserId)
+                .stream()
+                .findFirst()
+                .map(ConsultationDto::from)
+                .orElse(null);
     }
 
     // ── End ───────────────────────────────────────────────────────────────────

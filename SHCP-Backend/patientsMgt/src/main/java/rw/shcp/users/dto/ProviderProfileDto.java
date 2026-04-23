@@ -20,6 +20,7 @@ public record ProviderProfileDto(
         String facility,
         BigDecimal rating,
         boolean isActive,
+        boolean isAvailableForInstant,
         String profilePictureUrl,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt) {
@@ -38,6 +39,7 @@ public record ProviderProfileDto(
                 provider.getFacility(),
                 provider.getRating(),
                 provider.isActive(),
+                provider.isAvailableForInstant(),
                 u.getProfilePictureUrl(),
                 u.getCreatedAt(),
                 u.getUpdatedAt());

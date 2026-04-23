@@ -34,6 +34,12 @@ public class ProviderController {
 
     // ── Public endpoints ──────────────────────────────────────
 
+    @GetMapping("/instant-available")
+    @Operation(summary = "List providers currently available for instant consultations (public)")
+    public ResponseEntity<ApiResponse<List<InstantAvailableProviderDto>>> listInstantAvailable() {
+        return ResponseEntity.ok(ApiResponse.ok(providerService.getInstantAvailableProviders()));
+    }
+
     @GetMapping
     @Operation(summary = "List all active providers (public)")
     public ResponseEntity<ApiResponse<Page<ProviderSummaryDto>>> listProviders(
@@ -149,5 +155,13 @@ public class ProviderController {
         headers.setContentType(MediaType.parseMediaType("text/calendar"));
         headers.setContentDispositionFormData("attachment", "availability.ics");
         return ResponseEntity.ok().headers(headers).body(ical);
+    }
+
+    @PatchMapping("/me/instant-availability")
+    @PreAuthorize("hasRole('PROVIDER')")
+    @Operation(summary = "Toggle availability for instant consultations on/off")
+    public ResponseEntity<ApiResponse<ProviderProfileDto>> toggleInstantAvailability() {
+        UUID userId = SecurityUtils.currentUserId();
+        return ResponseEntity.ok(ApiResponse.ok(providerService.toggleInstantAvailability(userId)));
     }
 }

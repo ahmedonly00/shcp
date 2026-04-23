@@ -48,4 +48,7 @@ public class Provider {
 
     @Column(name = "district", length = 60)
     private String district;
+
+    @Column(name = "is_available_for_instant", nullable = false)
+    private boolean isAvailableForInstant = false;
 }

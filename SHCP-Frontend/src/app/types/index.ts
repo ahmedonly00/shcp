@@ -163,7 +163,7 @@ export interface ApiAppointmentDto {
   providerSpecialty?: string;   // absent in summary DTO
   slotId?: string;              // absent in summary DTO
   scheduledAt: string;          // ISO 8601 OffsetDateTime
-  type: 'VIDEO' | 'FOLLOWUP' | 'URGENT';
+  type: 'VIDEO' | 'FOLLOWUP' | 'URGENT' | 'INSTANT';
   status: 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW' | 'CONFIRMED' | 'PENDING';
   fee: number;
   paymentStatus: string;
@@ -180,6 +180,16 @@ export interface ApiProviderSummary {
   phone: string;
   rating?: number;
   totalConsultations?: number;
+  isAvailableForInstant?: boolean;
+}
+
+export interface ApiInstantAvailableProvider {
+  providerId: string;
+  name: string;
+  specialty: string;
+  facility: string;
+  rating?: number;
+  profilePictureUrl?: string;
 }
 
 export interface ApiSlot {
@@ -271,6 +281,7 @@ export interface ApiProviderProfile {
   licenseNumber: string;
   languagePref: string;
   isVerified: boolean;
+  isAvailableForInstant?: boolean;
   profilePictureUrl?: string;
   createdAt: string;
   updatedAt: string;
@@ -342,6 +353,7 @@ export interface ActivityLog {
 export interface ApiConsultationDto {
   consultationId: string;
   appointmentId: string;
+  patientId: string;
   roomId: string;
   status: 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
   startedAt: string;
@@ -356,7 +368,7 @@ export interface ApiConsultationDto {
 
 /** Convert backend appointment type → frontend type */
 export function fromBackendApptType(type: string): Appointment['type'] {
-  if (type === 'VIDEO') return 'video';
+  if (type === 'VIDEO' || type === 'INSTANT') return 'video';
   if (type === 'URGENT') return 'chat';
   return 'follow-up';
 }

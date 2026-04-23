@@ -1,5 +1,5 @@
 import { apiClient, unwrap, unwrapPage } from './client';
-import { ApiProviderSummary, ApiProviderProfile, ApiSlot, ApiAppointmentDto, ApiHealthRecordDto } from '@/app/types';
+import { ApiProviderSummary, ApiProviderProfile, ApiSlot, ApiAppointmentDto, ApiHealthRecordDto, ApiInstantAvailableProvider } from '@/app/types';
 
 export interface UpdateProviderRequest {
   name?: string;
@@ -66,4 +66,11 @@ export const providersApi = {
     const token = localStorage.getItem('accessToken') ?? '';
     return `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'}/api/users/me/files/${storedName}?token=${token}`;
   },
+
+  // ── Instant consult availability ──────────────────────────────────────────
+  getInstantAvailable: () =>
+    apiClient.get<ApiInstantAvailableProvider[]>('/providers/instant-available').then(unwrap<ApiInstantAvailableProvider[]>),
+
+  toggleInstantAvailability: () =>
+    apiClient.patch<ApiProviderProfile>('/providers/me/instant-availability', {}).then(unwrap<ApiProviderProfile>),
 };

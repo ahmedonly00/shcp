@@ -12,7 +12,8 @@ public record ProviderSummaryDto(
         String     specialty,
         String     facility,
         BigDecimal rating,
-        boolean    isActive
+        boolean    isActive,
+        boolean    isAvailableForInstant
 ) {
     public static ProviderSummaryDto from(Provider provider) {
         return new ProviderSummaryDto(
@@ -21,7 +22,8 @@ public record ProviderSummaryDto(
                 provider.getSpecialty(),
                 provider.getFacility(),
                 provider.getRating(),
-                provider.isActive()
+                provider.isActive(),
+                provider.isAvailableForInstant()
         );
     }
 }

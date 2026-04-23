@@ -19,4 +19,13 @@ public interface ConsultationRepository extends JpaRepository<Consultation, UUID
     List<Consultation> findByAppointment_Provider_UserIdOrderByCreatedAtDesc(UUID providerUserId);
 
     boolean existsByAppointment_AppointmentIdAndStatusNot(UUID appointmentId, ConsultationStatus status);
+
+    @org.springframework.data.jpa.repository.Query(
+        "SELECT c FROM Consultation c " +
+        "WHERE c.appointment.provider.userId = :providerId " +
+        "AND c.appointment.type = rw.shcp.common.enums.AppointmentType.INSTANT " +
+        "AND c.status = rw.shcp.common.enums.ConsultationStatus.IN_PROGRESS " +
+        "ORDER BY c.createdAt DESC")
+    java.util.List<Consultation> findIncomingInstantByProviderId(
+        @org.springframework.data.repository.query.Param("providerId") UUID providerId);
 }
