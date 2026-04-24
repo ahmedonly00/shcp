@@ -7,14 +7,16 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import rw.shcp.common.enums.*;
 import rw.shcp.common.exception.AppException;
 import rw.shcp.consultations.Consultation;
 import rw.shcp.consultations.ConsultationRepository;
 import rw.shcp.ehr.HealthRecord;
 import rw.shcp.ehr.HealthRecordRepository;
-import rw.shcp.notifications.NotificationEvent;
 import rw.shcp.notifications.NotificationPublisher;
+import rw.shcp.pharmacy.PharmacyService;
+import rw.shcp.prescriptions.PrescriptionIssuedEvent;
 import rw.shcp.prescriptions.dto.IssuePrescriptionRequest;
 import rw.shcp.prescriptions.dto.MedicationItem;
 import rw.shcp.prescriptions.dto.PrescriptionDto;
@@ -37,13 +39,15 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class PrescriptionServiceTest {
 
-    @Mock PrescriptionRepository  prescriptionRepository;
-    @Mock ConsultationRepository  consultationRepository;
-    @Mock PatientRepository       patientRepository;
-    @Mock ProviderRepository      providerRepository;
-    @Mock HealthRecordRepository  healthRecordRepository;
-    @Mock NotificationPublisher   notificationPublisher;
-    @Spy  ObjectMapper            objectMapper = new ObjectMapper();
+    @Mock PrescriptionRepository     prescriptionRepository;
+    @Mock ConsultationRepository     consultationRepository;
+    @Mock PatientRepository          patientRepository;
+    @Mock ProviderRepository         providerRepository;
+    @Mock HealthRecordRepository     healthRecordRepository;
+    @Mock PharmacyService            pharmacyService;
+    @Mock NotificationPublisher      notificationPublisher;
+    @Mock ApplicationEventPublisher  eventPublisher;
+    @Spy  ObjectMapper               objectMapper = new ObjectMapper();
 
     @InjectMocks PrescriptionService prescriptionService;
 
@@ -68,6 +72,8 @@ class PrescriptionServiceTest {
             p.setPrescriptionId(UUID.randomUUID());
             return p;
         });
+        when(pharmacyService.resolveNearest(any(), any(), any(), any(), any(), any()))
+                .thenThrow(AppException.notFound("No pharmacy available near delivery address"));
 
         IssuePrescriptionRequest req = new IssuePrescriptionRequest(
                 null, patientId,
@@ -77,13 +83,13 @@ class PrescriptionServiceTest {
 
         PrescriptionDto result = prescriptionService.issue(providerId, req);
 
-        assertThat(result.status()).isEqualTo("ACTIVE");
+        assertThat(result.status()).isEqualTo("PENDING");
         assertThat(result.patientId()).isEqualTo(patientId);
         verify(prescriptionRepository).save(any(Prescription.class));
         // EHR medications should be updated
         verify(healthRecordRepository).save(any(HealthRecord.class));
-        // 2 notifications: email + sms
-        verify(notificationPublisher, times(2)).publish(any(NotificationEvent.class));
+        // Prescription event published via Spring event bus (listener handles notifications)
+        verify(eventPublisher).publishEvent(any(PrescriptionIssuedEvent.class));
     }
 
     @Test

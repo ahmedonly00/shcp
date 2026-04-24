@@ -38,6 +38,7 @@ class AuthServiceTest {
     @Mock RefreshTokenRepository refreshTokenRepository;
     @Mock EmailService           emailService;
     @Mock AuthenticationManager  authManager;
+    @Mock RateLimitStore         rateLimitStore;
 
     @InjectMocks AuthService authService;
 
@@ -123,6 +124,8 @@ class AuthServiceTest {
     void login_shouldLockAccount_afterFiveFailedAttempts() {
         LoginRequest req = new LoginRequest("patient@test.com", "WrongPass");
         doThrow(new BadCredentialsException("bad")).when(authManager).authenticate(any());
+        // First 5 calls are below threshold; 6th call sees count >= MAX_FAILED_ATTEMPTS
+        when(rateLimitStore.getCount("10.0.0.1")).thenReturn(0L, 0L, 0L, 0L, 0L, 5L);
 
         // Trigger 5 failures to fill the rate limiter
         for (int i = 0; i < 5; i++) {

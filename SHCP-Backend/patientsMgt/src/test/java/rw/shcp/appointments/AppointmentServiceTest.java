@@ -10,6 +10,7 @@ import rw.shcp.common.enums.*;
 import rw.shcp.common.exception.AppException;
 import rw.shcp.notifications.NotificationEvent;
 import rw.shcp.notifications.NotificationPublisher;
+import rw.shcp.symptoms.SymptomReportRepository;
 import rw.shcp.users.model.Patient;
 import rw.shcp.users.model.User;
 import rw.shcp.users.model.Provider;
@@ -29,12 +30,13 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class AppointmentServiceTest {
 
-    @Mock AppointmentRepository  appointmentRepository;
-    @Mock AvailabilityRepository availabilityRepository;
-    @Mock PatientRepository      patientRepository;
-    @Mock ProviderRepository     providerRepository;
-    @Mock NotificationPublisher  notificationPublisher;
+    @Mock AppointmentRepository     appointmentRepository;
+    @Mock AvailabilityRepository    availabilityRepository;
+    @Mock PatientRepository         patientRepository;
+    @Mock ProviderRepository        providerRepository;
+    @Mock NotificationPublisher     notificationPublisher;
     @Mock rw.shcp.appointments.WaitlistService waitlistService;
+    @Mock SymptomReportRepository   symptomReportRepository;
 
     @InjectMocks AppointmentService appointmentService;
 
@@ -50,6 +52,7 @@ class AppointmentServiceTest {
         Provider provider = buildProvider(providerId);
         Availability slot = buildSlot(slotId, provider, false);
 
+        when(symptomReportRepository.existsByPatientUserId(patientId)).thenReturn(true);
         when(patientRepository.findById(patientId)).thenReturn(Optional.of(patient));
         when(providerRepository.findById(providerId)).thenReturn(Optional.of(provider));
         when(availabilityRepository.findById(slotId)).thenReturn(Optional.of(slot));
@@ -84,6 +87,7 @@ class AppointmentServiceTest {
         Provider provider = buildProvider(providerId);
         Availability slot = buildSlot(slotId, provider, true); // already booked
 
+        when(symptomReportRepository.existsByPatientUserId(patientId)).thenReturn(true);
         when(patientRepository.findById(patientId)).thenReturn(Optional.of(patient));
         when(providerRepository.findById(providerId)).thenReturn(Optional.of(provider));
         when(availabilityRepository.findById(slotId)).thenReturn(Optional.of(slot));
@@ -105,6 +109,7 @@ class AppointmentServiceTest {
         Patient  patient  = buildPatient(patientId);
         Provider provider = buildProvider(providerId);
 
+        when(symptomReportRepository.existsByPatientUserId(patientId)).thenReturn(true);
         when(patientRepository.findById(patientId)).thenReturn(Optional.of(patient));
         when(providerRepository.findById(providerId)).thenReturn(Optional.of(provider));
         when(appointmentRepository.existsByProviderUserIdAndScheduledAt(
@@ -127,6 +132,7 @@ class AppointmentServiceTest {
         Provider provider = buildProvider(providerId);
         provider.setActive(false);
 
+        when(symptomReportRepository.existsByPatientUserId(patientId)).thenReturn(true);
         when(patientRepository.findById(patientId)).thenReturn(Optional.of(patient));
         when(providerRepository.findById(providerId)).thenReturn(Optional.of(provider));
 
@@ -148,6 +154,7 @@ class AppointmentServiceTest {
         Patient  patient  = buildPatient(patientId);
         Provider provider = buildProvider(providerId);
 
+        when(symptomReportRepository.existsByPatientUserId(patientId)).thenReturn(true);
         when(patientRepository.findById(patientId)).thenReturn(Optional.of(patient));
         when(providerRepository.findById(providerId)).thenReturn(Optional.of(provider));
         when(appointmentRepository.existsByProviderUserIdAndScheduledAt(any(), any()))

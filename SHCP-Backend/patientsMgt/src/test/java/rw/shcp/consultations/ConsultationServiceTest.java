@@ -7,6 +7,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import rw.shcp.appointments.Appointment;
 import rw.shcp.appointments.AppointmentRepository;
+import rw.shcp.consultations.ConsultationAuditEventRepository;
 import rw.shcp.common.enums.*;
 import rw.shcp.common.exception.AppException;
 import rw.shcp.consultations.dto.ConsultationDto;
@@ -30,9 +31,10 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class ConsultationServiceTest {
 
-    @Mock ConsultationRepository consultationRepository;
-    @Mock AppointmentRepository  appointmentRepository;
-    @Mock NotificationPublisher  notificationPublisher;
+    @Mock ConsultationRepository            consultationRepository;
+    @Mock ConsultationAuditEventRepository  auditRepository;
+    @Mock AppointmentRepository             appointmentRepository;
+    @Mock NotificationPublisher             notificationPublisher;
 
     @InjectMocks ConsultationService consultationService;
 
