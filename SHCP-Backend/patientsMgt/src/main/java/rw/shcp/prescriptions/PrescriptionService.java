@@ -56,6 +56,10 @@ public class PrescriptionService {
     @Transactional
     @PreAuthorize("hasRole('PROVIDER')")
     public PrescriptionDto issue(UUID providerUserId, IssuePrescriptionRequest req) {
+        if (req.medications() == null || req.medications().isEmpty()) {
+            throw AppException.badRequest("A prescription must include at least one medication");
+        }
+
         Provider provider = providerRepository.findById(providerUserId)
                 .orElseThrow(() -> AppException.notFound("Provider not found"));
 
@@ -221,7 +225,7 @@ public class PrescriptionService {
 
         try {
             List<Map<String, Object>> existing = objectMapper.readValue(
-                    ehr.getMedications(),
+                    ehr.getMedications() != null ? ehr.getMedications() : "[]",
                     new TypeReference<>() {});
 
             List<Map<String, Object>> toAdd = objectMapper.convertValue(
@@ -252,7 +256,8 @@ public class PrescriptionService {
         healthRecordRepository.findByPatientUserId(patient.getUserId()).ifPresent(ehr -> {
             try {
                 List<Map<String, Object>> allergies = objectMapper.readValue(
-                        ehr.getAllergies(), new TypeReference<>() {});
+                        ehr.getAllergies() != null ? ehr.getAllergies() : "[]",
+                        new TypeReference<>() {});
                 for (MedicationItem med : medications) {
                     for (Map<String, Object> allergy : allergies) {
                         String allergen = String.valueOf(allergy.getOrDefault("name", ""))

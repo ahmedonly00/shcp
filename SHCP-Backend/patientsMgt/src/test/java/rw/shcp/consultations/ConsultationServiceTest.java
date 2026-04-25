@@ -18,6 +18,9 @@ import rw.shcp.notifications.NotificationPublisher;
 import rw.shcp.users.model.Patient;
 import rw.shcp.users.model.Provider;
 import rw.shcp.users.model.User;
+import rw.shcp.users.repository.PatientRepository;
+import rw.shcp.users.repository.ProviderRepository;
+import rw.shcp.common.storage.FileStorageService;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -35,6 +38,9 @@ class ConsultationServiceTest {
     @Mock ConsultationAuditEventRepository  auditRepository;
     @Mock AppointmentRepository             appointmentRepository;
     @Mock NotificationPublisher             notificationPublisher;
+    @Mock FileStorageService                fileStorageService;
+    @Mock PatientRepository                 patientRepository;
+    @Mock ProviderRepository                providerRepository;
 
     @InjectMocks ConsultationService consultationService;
 

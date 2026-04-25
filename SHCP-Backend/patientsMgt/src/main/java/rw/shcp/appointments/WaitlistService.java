@@ -52,7 +52,13 @@ public class WaitlistService {
 
         List<Waitlist> queue = waitlistRepository
                 .findByProvider_UserIdAndDateOrderByCreatedAtAsc(req.providerId(), req.date());
-        int position = queue.indexOf(saved) + 1;
+        int position = 1;
+        for (int i = 0; i < queue.size(); i++) {
+            if (queue.get(i).getEntryId().equals(saved.getEntryId())) {
+                position = i + 1;
+                break;
+            }
+        }
 
         log.info("Patient {} joined waitlist for provider {} on {} (position {})",
                 patientId, req.providerId(), req.date(), position);
@@ -76,7 +82,13 @@ public class WaitlistService {
                     List<Waitlist> queue = waitlistRepository
                             .findByProvider_UserIdAndDateOrderByCreatedAtAsc(
                                     w.getProvider().getUserId(), w.getDate());
-                    int pos = queue.indexOf(w) + 1;
+                    int pos = 1;
+                    for (int i = 0; i < queue.size(); i++) {
+                        if (queue.get(i).getEntryId().equals(w.getEntryId())) {
+                            pos = i + 1;
+                            break;
+                        }
+                    }
                     return WaitlistDto.from(w, pos);
                 })
                 .toList();

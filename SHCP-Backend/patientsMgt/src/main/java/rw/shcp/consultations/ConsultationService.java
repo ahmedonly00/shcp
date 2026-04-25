@@ -223,6 +223,11 @@ public class ConsultationService {
         appointment.setStatus(AppointmentStatus.COMPLETED);
         appointmentRepository.save(appointment);
 
+        // Release the instant slot so the provider becomes available again for future instant consults
+        if (appointment.getType() == AppointmentType.INSTANT) {
+            providerRepository.releaseInstantSlot(appointment.getProvider().getUserId());
+        }
+
         Consultation saved = consultationRepository.save(consultation);
         log.info("Consultation {} ended: duration={}min", consultationId, minutes);
 

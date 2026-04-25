@@ -21,4 +21,9 @@ public interface ProviderRepository extends JpaRepository<Provider, UUID> {
     @Query("UPDATE Provider p SET p.isAvailableForInstant = false " +
            "WHERE p.userId = :providerId AND p.isAvailableForInstant = true")
     int claimInstantSlot(@Param("providerId") UUID providerId);
+
+    /** Releases the instant slot after a consultation ends so the provider becomes available again. */
+    @Modifying
+    @Query("UPDATE Provider p SET p.isAvailableForInstant = true WHERE p.userId = :providerId")
+    void releaseInstantSlot(@Param("providerId") UUID providerId);
 }

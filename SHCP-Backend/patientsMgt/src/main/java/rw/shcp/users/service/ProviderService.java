@@ -244,7 +244,8 @@ public class ProviderService {
         req.slots().forEach(s -> {
             if (!s.endTime().isAfter(s.startTime())) {
                 throw AppException.badRequest(
-                        "Slot end time must be after start time: " + s.startTime());
+                        "Slot end time must be after start time. Start: "
+                        + s.startTime() + " End: " + s.endTime());
             }
         });
     }

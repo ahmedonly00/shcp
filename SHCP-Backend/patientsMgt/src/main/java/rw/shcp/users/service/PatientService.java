@@ -3,6 +3,7 @@ package rw.shcp.users.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -132,27 +133,32 @@ public class PatientService {
         HealthRecord ehr = ehrRepository.findByPatientUserId(userId)
                 .orElseGet(() -> createEmptyEhr(patient));
 
-        // Build JSON entry and append to the documents array
-        String newDoc = String.format(
-                "{\"title\":\"%s\",\"date\":\"%s\",\"fileUrl\":\"%s\",\"storedName\":\"%s\",\"contentType\":\"%s\"}",
-                escape(entry.title()), escape(entry.date()),
-                escape(entry.fileUrl()), escape(entry.storedName()),
-                escape(entry.contentType() != null ? entry.contentType() : "application/octet-stream")
-        );
+        try {
+            ObjectNode newDoc = objectMapper.createObjectNode();
+            newDoc.put("title",       entry.title());
+            newDoc.put("date",        entry.date());
+            newDoc.put("fileUrl",     entry.fileUrl());
+            newDoc.put("storedName",  entry.storedName());
+            newDoc.put("contentType", entry.contentType() != null
+                    ? entry.contentType() : "application/octet-stream");
 
-        String existing = ehr.getDocuments();
-        // Strip trailing ] and append
-        String trimmed = existing.trim();
-        String updated = trimmed.equals("[]")
-                ? "[" + newDoc + "]"
-                : trimmed.substring(0, trimmed.length() - 1) + "," + newDoc + "]";
+            String existing = ehr.getDocuments();
+            ArrayNode array;
+            if (existing == null || existing.isBlank()) {
+                array = objectMapper.createArrayNode();
+            } else {
+                JsonNode parsed = objectMapper.readTree(existing);
+                array = parsed.isArray()
+                        ? (ArrayNode) parsed
+                        : objectMapper.createArrayNode();
+            }
+            array.add(newDoc);
+            ehr.setDocuments(objectMapper.writeValueAsString(array));
+        } catch (Exception e) {
+            throw AppException.badRequest("Failed to append document: " + e.getMessage());
+        }
 
-        ehr.setDocuments(updated);
         return HealthRecordDto.from(ehrRepository.save(ehr));
-    }
-
-    private static String escape(String s) {
-        return s == null ? "" : s.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 
     // ── EHR update ────────────────────────────────────────────

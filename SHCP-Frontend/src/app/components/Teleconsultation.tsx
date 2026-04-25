@@ -207,7 +207,7 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
       } catch { /* ignore */ }
     };
     poll();
-    instantPollRef.current = setInterval(poll, 8000);
+    instantPollRef.current = setInterval(poll, 3000);
     return () => { if (instantPollRef.current) clearInterval(instantPollRef.current); };
   }, [isProvider, instantAvailable, phase]);
 
