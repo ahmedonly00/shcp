@@ -45,6 +45,7 @@ mail:
 # ── Provider credentials ──────────────────────────────────────────────────────
 shcp:
   fcm:
+    credentials-base64: ${FCM_CREDENTIALS_BASE64:}
     credentials-path: ${FCM_CREDENTIALS_PATH:../secrets/fcm-credentials.json}
 
 # ── Actuator health (Docker HEALTHCHECK) ─────────────────────────────────────
