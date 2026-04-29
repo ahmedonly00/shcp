@@ -58,7 +58,8 @@ public class FcmConfig {
     private InputStream openCredentialsStream() throws IOException {
         if (StringUtils.hasText(credentialsBase64)) {
             byte[] decoded = Base64.getMimeDecoder().decode(credentialsBase64.trim());
-            return new ByteArrayInputStream(decoded);
+            String json = new String(decoded).replace("\\n", "\n");
+            return new ByteArrayInputStream(json.getBytes());
         }
         java.io.File file = new java.io.File(credentialsPath);
         if (file.exists()) {
