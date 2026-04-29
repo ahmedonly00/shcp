@@ -1,8 +1,9 @@
 package rw.shcp.consumer.consumer;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 import rw.shcp.consumer.config.RabbitMQConfig;
 import rw.shcp.consumer.entity.NotificationRecord;
@@ -17,16 +18,36 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @Component
-@RequiredArgsConstructor
 @Slf4j
 public class PushConsumer {
 
+    @Nullable
     private final PushProvider                 pushProvider;
     private final NotificationRecordRepository recordRepository;
+
+    @Autowired
+    public PushConsumer(@Autowired(required = false) @Nullable PushProvider pushProvider,
+                        NotificationRecordRepository recordRepository) {
+        this.pushProvider     = pushProvider;
+        this.recordRepository = recordRepository;
+        if (pushProvider == null) {
+            log.warn("PushConsumer initialised without a PushProvider — " +
+                     "push notifications will be skipped until Firebase is configured.");
+        }
+    }
 
     @RabbitListener(queues = RabbitMQConfig.QUEUE_PUSH)
     public void consume(NotificationEvent event) {
         log.info("Push consumer: event={} userId={}", event.eventType(), event.userId());
+
+        if (pushProvider == null) {
+            // Firebase is not configured — record the failure and ack the message
+            // so it is not re-queued indefinitely while credentials are being fixed.
+            recordRepository.save(buildRecord(event, "PUSH", Status.FAILED,
+                    "Push provider unavailable: Firebase not configured", null));
+            log.warn("Push skipped — no push provider available (Firebase not configured) for userId={}", event.userId());
+            return;
+        }
 
         String token = event.recipientDeviceToken();
         if (token == null || token.isBlank()) {
