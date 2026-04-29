@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.lang.Nullable;
 import org.springframework.util.StringUtils;
 
 import java.io.ByteArrayInputStream;
@@ -15,7 +16,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Base64;
-import java.util.Optional;
 
 @Configuration
 @Slf4j
@@ -28,6 +28,7 @@ public class FcmConfig {
     private String credentialsPath;
 
     @Bean
+    @Nullable
     public FirebaseApp firebaseApp() {
         if (!FirebaseApp.getApps().isEmpty()) {
             return FirebaseApp.getInstance();
@@ -43,16 +44,31 @@ public class FcmConfig {
                     FirebaseOptions.builder().setCredentials(credentials).build());
             log.info("Firebase Admin SDK initialised");
             return app;
-        } catch (IOException e) {
-            log.warn("Failed to load FCM credentials — push notifications disabled: {}", e.getMessage());
+        } catch (Exception e) {
+            log.warn("Failed to initialise Firebase — push notifications disabled: {}", e.getMessage());
             return null;
         }
     }
 
-    /** Null-safe: returns null when FCM credentials are not configured. */
+    /**
+     * Returns null when Firebase failed to initialise, allowing the application
+     * to start without push-notification support. FcmPushProvider guards against
+     * a null FirebaseMessaging via @Autowired(required = false).
+     */
     @Bean
-    public FirebaseMessaging firebaseMessaging(Optional<FirebaseApp> firebaseApp) {
-        return firebaseApp.map(FirebaseMessaging::getInstance).orElse(null);
+    @Nullable
+    public FirebaseMessaging firebaseMessaging() {
+        try {
+            if (FirebaseApp.getApps().isEmpty()) {
+                log.warn("FirebaseApp not initialised — FirebaseMessaging bean will be null.");
+                return null;
+            }
+            return FirebaseMessaging.getInstance();
+        } catch (Exception e) {
+            log.warn("Failed to obtain FirebaseMessaging instance — push notifications disabled: {}",
+                     e.getMessage());
+            return null;
+        }
     }
 
     private InputStream openCredentialsStream() throws IOException {
