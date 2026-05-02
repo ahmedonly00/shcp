@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import {
   Activity, Calendar, FileText, Clock, TrendingUp,
   Heart, Thermometer, Droplet, Scale, AlertCircle,
-  Plus, Download, Eye, Pill, MapPin, Navigation, Bike
+  Plus, Download, Eye, Pill, MapPin, Navigation, Bike, Loader2
 } from 'lucide-react';
 import { Skeleton } from '@/app/components/ui/skeleton';
 import { useAuth } from '@/app/context/AuthContext';
@@ -19,8 +19,9 @@ import { analyticsApi } from '@/app/api/analytics';
 import { getActiveDelivery, DeliveryDto } from '@/app/api/deliveries';
 import {
   Appointment, HealthRecord, VitalSign,
-  ApiPatientHealthSummary, mapApiAppointment, mapApiPrescription
+  ApiPatientHealthSummary, ApiPrescriptionDto, mapApiAppointment, mapApiPrescription
 } from '@/app/types';
+import { downloadPrescriptionPdf } from '@/app/lib/downloadPrescriptionPdf';
 type VitalSignType = VitalSign;
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { toast } from 'sonner';
@@ -103,6 +104,8 @@ export const PatientDashboard: React.FC = () => {
 
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [prescriptions, setPrescriptions] = useState<HealthRecord[]>([]);
+  const [rawPrescriptions, setRawPrescriptions] = useState<ApiPrescriptionDto[]>([]);
+  const [downloadingRxId, setDownloadingRxId] = useState<string | null>(null);
   const [summary, setSummary] = useState<ApiPatientHealthSummary | null>(null);
   const [vitals, setVitals] = useState<VitalSign[]>(defaultVitals);
   const [loading, setLoading] = useState(true);
@@ -128,7 +131,9 @@ export const PatientDashboard: React.FC = () => {
           setAppointments((apptRes.value ?? []).map(mapApiAppointment));
         }
         if (prescRes.status === 'fulfilled') {
-          setPrescriptions((prescRes.value ?? []).map(mapApiPrescription));
+          const raw = prescRes.value ?? [];
+          setRawPrescriptions(raw);
+          setPrescriptions(raw.map(mapApiPrescription));
         }
         if (summaryRes.status === 'fulfilled') {
           setSummary(summaryRes.value);
@@ -141,6 +146,19 @@ export const PatientDashboard: React.FC = () => {
     };
     load();
   }, []);
+
+  const handleDownloadRx = async (recordId: string) => {
+    const rx = rawPrescriptions.find(r => r.prescriptionId === recordId);
+    if (!rx) { toast.error('Prescription data not available'); return; }
+    setDownloadingRxId(recordId);
+    try {
+      await downloadPrescriptionPdf(rx);
+    } catch {
+      toast.error('Could not generate PDF — please try again');
+    } finally {
+      setDownloadingRxId(null);
+    }
+  };
 
   // Poll for active delivery tracking every 15 s while the component is mounted
   useEffect(() => {
@@ -471,26 +489,52 @@ export const PatientDashboard: React.FC = () => {
             </div>
           ) : recentRecords.length > 0 ? (
             <div className="space-y-3">
-              {recentRecords.map((record) => (
-                <div key={record.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50">
-                  <div className="flex items-center gap-4">
-                    <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                      <Pill className="h-5 w-5 text-blue-600" />
-                    </div>
-                    <div>
-                      <h4 className="font-medium">{record.title}</h4>
-                      <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1">
-                        <Badge variant="outline" className="text-xs">prescription</Badge>
-                        <span className="text-xs">{record.date}</span>
-                        {record.doctor && <span className="text-xs">{record.doctor}</span>}
+              {recentRecords.map((record) => {
+                const raw = rawPrescriptions.find(r => r.prescriptionId === record.id);
+                const statusColor =
+                  raw?.status === 'DELIVERED'           ? 'bg-green-100 text-green-800' :
+                  raw?.status === 'CANCELLED' || raw?.status === 'FAILED' ? 'bg-red-100 text-red-800' :
+                  raw?.status === 'READY_FOR_DELIVERY' || raw?.status === 'PICKED_UP' || raw?.status === 'ON_THE_WAY'
+                                                        ? 'bg-blue-100 text-blue-800' :
+                  'bg-yellow-100 text-yellow-800';
+                return (
+                  <div key={record.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50">
+                    <div className="flex items-center gap-4">
+                      <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                        <Pill className="h-5 w-5 text-blue-600" />
+                      </div>
+                      <div>
+                        <h4 className="font-medium">{record.title}</h4>
+                        <div className="flex items-center gap-2 flex-wrap mt-1">
+                          {raw && (
+                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${statusColor}`}>
+                              {raw.status.replace(/_/g, ' ')}
+                            </span>
+                          )}
+                          <span className="text-xs text-muted-foreground">{record.date}</span>
+                          {record.doctor && <span className="text-xs text-muted-foreground">{record.doctor}</span>}
+                          {raw?.pharmacyName && (
+                            <span className="text-xs text-muted-foreground">· {raw.pharmacyName}</span>
+                          )}
+                        </div>
                       </div>
                     </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="shrink-0 gap-1.5"
+                      onClick={() => handleDownloadRx(record.id)}
+                      disabled={downloadingRxId === record.id}
+                    >
+                      {downloadingRxId === record.id
+                        ? <Loader2 className="h-4 w-4 animate-spin" />
+                        : <Download className="h-4 w-4" />
+                      }
+                      <span className="hidden sm:inline text-xs">PDF</span>
+                    </Button>
                   </div>
-                  <Button size="sm" variant="ghost">
-                    <Eye className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="text-center py-8 text-muted-foreground">
@@ -568,15 +612,58 @@ export const PatientDashboard: React.FC = () => {
           <div className="space-y-3 max-h-96 overflow-y-auto">
             {prescriptions.length === 0 ? (
               <p className="text-center text-muted-foreground py-4">No prescriptions found.</p>
-            ) : prescriptions.map((record) => (
-              <div key={record.id} className="flex items-center justify-between p-4 border rounded-lg">
-                <div>
-                  <h4 className="font-medium text-sm">{record.title}</h4>
-                  <p className="text-xs text-muted-foreground">{record.date} {record.doctor && `• ${record.doctor}`}</p>
+            ) : prescriptions.map((record) => {
+              const raw = rawPrescriptions.find(r => r.prescriptionId === record.id);
+              let medCount = 0;
+              try { medCount = JSON.parse(raw?.medications ?? '[]').length; } catch { medCount = 0; }
+              const statusColor =
+                raw?.status === 'DELIVERED'           ? 'bg-green-100 text-green-800' :
+                raw?.status === 'CANCELLED' || raw?.status === 'FAILED' ? 'bg-red-100 text-red-800' :
+                raw?.status === 'READY_FOR_DELIVERY' || raw?.status === 'PICKED_UP' || raw?.status === 'ON_THE_WAY'
+                                                      ? 'bg-blue-100 text-blue-800' :
+                'bg-yellow-100 text-yellow-800';
+              return (
+                <div key={record.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/30">
+                  <div className="flex items-center gap-3">
+                    <div className="h-9 w-9 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
+                      <Pill className="h-4 w-4 text-blue-600" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="font-medium text-sm">{record.title}</h4>
+                        {raw && (
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${statusColor}`}>
+                            {raw.status.replace(/_/g, ' ')}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {record.date}
+                        {record.doctor && ` · Dr. ${record.doctor}`}
+                        {medCount > 0 && ` · ${medCount} medication${medCount !== 1 ? 's' : ''}`}
+                        {raw?.pharmacyName && ` · ${raw.pharmacyName}`}
+                      </p>
+                      {raw?.validUntil && (
+                        <p className="text-xs text-muted-foreground/70">Valid until: {raw.validUntil}</p>
+                      )}
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="shrink-0 gap-1.5 ml-2"
+                    onClick={() => handleDownloadRx(record.id)}
+                    disabled={downloadingRxId === record.id}
+                  >
+                    {downloadingRxId === record.id
+                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      : <Download className="h-3.5 w-3.5" />
+                    }
+                    <span className="text-xs">PDF</span>
+                  </Button>
                 </div>
-                <Button size="sm" variant="ghost"><Eye className="h-4 w-4" /></Button>
-              </div>
-            ))}
+              );
+            })}
           </div>
           <div className="mt-4 flex justify-end">
             <Button variant="outline" onClick={() => setShowAllRecordsDialog(false)}>Close</Button>
