@@ -79,7 +79,7 @@ spring:
 
 # ── Server ────────────────────────────────────────────────────
 server:
-  port: 8080
+  port: ${PORT:8080}
   servlet:
     context-path: /
   compression:
@@ -117,7 +117,8 @@ app:
 # ── Firebase + SLA ────────────────────────────────────────────
 shcp:
   firebase:
-    credentials-path: ${FIREBASE_CREDENTIALS_PATH:../../secrets/fcm-credentials.json}
+    credentials-base64: ${FIREBASE_CREDENTIALS_BASE64:}
+    credentials-path: ${FIREBASE_CREDENTIALS_PATH:}
   sla:
     # Prescriptions PENDING longer than this many minutes are escalated
     pending-threshold-minutes: ${SLA_PENDING_THRESHOLD_MINUTES:30}

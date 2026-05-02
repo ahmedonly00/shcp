@@ -55,10 +55,10 @@ management:
       exposure:
         include: health
   server:
-    port: 8081
+    port: ${PORT:8081}
 
 server:
-  port: 8081
+  port: ${PORT:8081}
 
 logging:
   level:

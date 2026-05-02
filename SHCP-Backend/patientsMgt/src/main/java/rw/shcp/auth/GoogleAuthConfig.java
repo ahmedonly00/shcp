@@ -10,9 +10,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.io.ByteArrayInputStream;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Base64;
 
 /**
  * Initialises Firebase Admin SDK in the backend solely for
@@ -23,6 +25,9 @@ import java.io.InputStream;
 @Slf4j
 public class GoogleAuthConfig {
 
+    @Value("${shcp.firebase.credentials-base64:}")
+    private String credentialsBase64;
+
     @Value("${shcp.firebase.credentials-path:}")
     private String credentialsPath;
 
@@ -31,22 +36,36 @@ public class GoogleAuthConfig {
         if (!FirebaseApp.getApps().isEmpty()) {
             return FirebaseApp.getInstance();
         }
-        if (credentialsPath == null || credentialsPath.isBlank()) {
-            log.warn("shcp.firebase.credentials-path not set — Google login disabled");
-            return null;
-        }
-        try (InputStream is = new FileInputStream(credentialsPath)) {
+        try (InputStream is = openCredentialsStream()) {
+            if (is == null) {
+                log.warn("Firebase credentials not configured — Google login disabled. " +
+                         "Set FIREBASE_CREDENTIALS_BASE64 or FIREBASE_CREDENTIALS_PATH to enable it.");
+                return null;
+            }
             FirebaseOptions options = FirebaseOptions.builder()
                     .setCredentials(GoogleCredentials.fromStream(is))
                     .build();
             FirebaseApp app = FirebaseApp.initializeApp(options);
-            log.info("Firebase Admin SDK initialised for Google auth from {}", credentialsPath);
+            log.info("Firebase Admin SDK initialised for Google auth");
             return app;
         } catch (IOException e) {
-            log.warn("Firebase credentials not found at {} — Google login disabled: {}",
-                    credentialsPath, e.getMessage());
+            log.warn("Failed to load Firebase credentials — Google login disabled: {}", e.getMessage());
             return null;
         }
+    }
+
+    private InputStream openCredentialsStream() throws IOException {
+        if (credentialsBase64 != null && !credentialsBase64.isBlank()) {
+            byte[] decoded = Base64.getDecoder().decode(credentialsBase64.trim());
+            return new ByteArrayInputStream(decoded);
+        }
+        if (credentialsPath != null && !credentialsPath.isBlank()) {
+            java.io.File file = new java.io.File(credentialsPath);
+            if (file.exists()) {
+                return new FileInputStream(file);
+            }
+        }
+        return null;
     }
 
     /** Null when Firebase is not configured — callers must check before use. */
