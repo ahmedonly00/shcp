@@ -1,11 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/app/components/ui/button';
 import { Card, CardContent } from '@/app/components/ui/card';
+import { Sheet, SheetContent, SheetTrigger } from '@/app/components/ui/sheet';
 import {
   ArrowRight, Phone, Activity, Calendar, Video,
   FileText, Shield, Users, Star, CheckCircle,
-  Heart, Smartphone, Clock, Map, Award
+  Heart, Smartphone, Clock, Map, Award, Menu
 } from 'lucide-react';
 import { ImageWithFallback } from '@/app/components/figma/ImageWithFallback';
 
@@ -31,28 +32,66 @@ function BrandLogo({ inverted = false }: { inverted?: boolean }) {
 
 export const HomePage: React.FC<HomePageProps> = ({ onGetStarted }) => {
   const { t } = useTranslation();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const navLinks = [
+    { href: '#home', label: t('home.page.nav.home') },
+    { href: '#services', label: t('home.page.nav.services') },
+    { href: '#how-it-works', label: t('home.page.nav.howItWorks') },
+    { href: '#about', label: t('home.page.nav.about') },
+  ];
 
   return (
     <div className="min-h-screen bg-background">
 
       {/* ── Navigation ───────────────────────────────────────────────── */}
-      <header className="py-4 px-6 lg:px-8 sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
+      <header className="py-4 px-4 sm:px-6 lg:px-8 sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
           <BrandLogo />
 
+          {/* Desktop nav */}
           <nav className="hidden md:flex items-center gap-8">
-            <a href="#home" className="text-foreground/70 hover:text-primary font-medium transition-colors text-sm">{t('home.page.nav.home')}</a>
-            <a href="#services" className="text-foreground/70 hover:text-primary font-medium transition-colors text-sm">{t('home.page.nav.services')}</a>
-            <a href="#how-it-works" className="text-foreground/70 hover:text-primary font-medium transition-colors text-sm">{t('home.page.nav.howItWorks')}</a>
-            <a href="#about" className="text-foreground/70 hover:text-primary font-medium transition-colors text-sm">{t('home.page.nav.about')}</a>
+            {navLinks.map(l => (
+              <a key={l.href} href={l.href} className="text-foreground/70 hover:text-primary font-medium transition-colors text-sm">{l.label}</a>
+            ))}
           </nav>
 
-          <Button
-            onClick={onGetStarted}
-            className="bg-primary hover:bg-primary/90 text-white rounded-full px-6 text-sm"
-          >
-            {t('home.page.nav.getStarted')}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={onGetStarted}
+              className="bg-primary hover:bg-primary/90 text-white rounded-full px-5 sm:px-6 text-sm"
+            >
+              {t('home.page.nav.getStarted')}
+            </Button>
+
+            {/* Mobile hamburger */}
+            <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="md:hidden">
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-72 pt-12">
+                <nav className="flex flex-col gap-1">
+                  {navLinks.map(l => (
+                    <a
+                      key={l.href}
+                      href={l.href}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="text-foreground/80 hover:text-primary hover:bg-primary/5 font-medium transition-colors text-base px-4 py-3 rounded-lg"
+                    >
+                      {l.label}
+                    </a>
+                  ))}
+                  <div className="mt-4 px-4">
+                    <Button onClick={() => { onGetStarted(); setMobileMenuOpen(false); }} className="w-full bg-primary text-white rounded-full">
+                      {t('home.page.nav.getStarted')}
+                    </Button>
+                  </div>
+                </nav>
+              </SheetContent>
+            </Sheet>
+          </div>
         </div>
       </header>
 
@@ -75,7 +114,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onGetStarted }) => {
               </div>
 
               <div>
-                <h1 className="mb-6 text-4xl font-bold leading-tight tracking-tight text-primary lg:text-5xl xl:text-6xl" style={{ whiteSpace: 'pre-line' }}>
+                <h1 className="mb-6 text-3xl sm:text-4xl font-bold leading-tight tracking-tight text-primary lg:text-5xl xl:text-6xl" style={{ whiteSpace: 'pre-line' }}>
                   {t('home.page.hero.title')}
                 </h1>
                 <p className="mb-8 text-lg leading-relaxed text-foreground/70 lg:text-xl">
@@ -141,7 +180,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onGetStarted }) => {
                 <ImageWithFallback
                   src="https://images.unsplash.com/photo-1666886573681-a8fbe983a3fd?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhZnJpY2FuJTIwd29tYW4lMjB2aWRlbyUyMGNhbGwlMjBkb2N0b3IlMjBwaG9uZXxlbnwxfHx8fDE3NjkzMzA2NTJ8MA&ixlib=rb-4.1.0&q=80&w=1080"
                   alt="Rwandan patient having video consultation with doctor"
-                  className="h-[500px] w-full object-cover lg:h-[580px]"
+                  className="h-[260px] sm:h-[380px] lg:h-[500px] xl:h-[580px] w-full object-cover"
                 />
                 <div className="absolute bottom-6 left-6 right-6 rounded-2xl bg-card/95 p-5 shadow-xl backdrop-blur-sm">
                   <div className="flex items-center gap-4">
@@ -175,7 +214,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onGetStarted }) => {
           <p className="text-center text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-6">
             Endorsed &amp; Compliant With
           </p>
-          <div className="flex flex-wrap items-center justify-center gap-8 md:gap-14">
+          <div className="flex flex-wrap items-center justify-center gap-5 sm:gap-8 md:gap-14">
             {[
               { icon: <Award className="h-4 w-4" />, label: 'Ministry of Health, Rwanda' },
               { icon: <Shield className="h-4 w-4" />, label: 'Rwanda Biomedical Centre' },
@@ -195,7 +234,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onGetStarted }) => {
       <section id="services" className="bg-background py-20">
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-primary mb-4">{t('home.page.services.title')}</h2>
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-primary mb-4">{t('home.page.services.title')}</h2>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
               {t('home.page.services.subtitle')}
             </p>
@@ -269,7 +308,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onGetStarted }) => {
       <section id="how-it-works" className="bg-slate-50 py-20">
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-primary mb-4">{t('home.page.howItWorks.title')}</h2>
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-primary mb-4">{t('home.page.howItWorks.title')}</h2>
             <p className="text-xl text-foreground/70 max-w-2xl mx-auto">
               {t('home.page.howItWorks.subtitle')}
             </p>
@@ -287,7 +326,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onGetStarted }) => {
                   <div className="hidden md:block absolute top-5 left-full w-10 border-t-2 border-dashed border-primary/20 -translate-y-1/2 z-0" />
                 )}
                 <div className="flex items-start gap-4">
-                  <span className="text-6xl font-black text-primary/10 leading-none select-none shrink-0 -mt-2">{item.step}</span>
+                  <span className="text-4xl sm:text-5xl md:text-6xl font-black text-primary/10 leading-none select-none shrink-0 -mt-2">{item.step}</span>
                   <div>
                     <div className="flex items-center gap-2 mb-2">
                       <div className="bg-primary/10 text-primary rounded-lg p-1.5 shrink-0">{item.icon}</div>
@@ -317,7 +356,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onGetStarted }) => {
       <section className="bg-background py-20">
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-primary mb-4">{t('home.page.testimonials.title')}</h2>
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-primary mb-4">{t('home.page.testimonials.title')}</h2>
             <p className="text-xl text-muted-foreground">{t('home.page.testimonials.subtitle')}</p>
           </div>
 
@@ -389,7 +428,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onGetStarted }) => {
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div>
-              <h2 className="text-4xl font-bold text-white mb-6">{t('home.page.about.title')}</h2>
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-6">{t('home.page.about.title')}</h2>
               <p className="text-white/90 text-lg mb-6 leading-relaxed">
                 {t('home.page.about.p1')}
               </p>
@@ -424,7 +463,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onGetStarted }) => {
       {/* ── CTA — dual audience ───────────────────────────────────────── */}
       <section className="bg-background py-20">
         <div className="max-w-4xl mx-auto px-6 lg:px-8 text-center">
-          <h2 className="text-4xl lg:text-5xl font-bold text-primary mb-4">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-primary mb-4">
             {t('home.page.cta.title')}
           </h2>
           <p className="text-xl text-foreground/70 mb-12">

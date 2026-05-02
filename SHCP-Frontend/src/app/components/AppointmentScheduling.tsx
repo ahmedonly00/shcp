@@ -229,14 +229,18 @@ export const AppointmentScheduling: React.FC<AppointmentSchedulingProps> = ({ on
       {/* MAIN TABS — only shown on search step */}
       {step === 'search' && (
         <Tabs defaultValue={isProvider ? 'my' : 'book'}>
-          <TabsList className="mb-4">
+          <TabsList className="mb-4 w-full">
             {!isProvider && (
-              <TabsTrigger value="book" className="flex items-center gap-2">
-                <Plus className="h-4 w-4" /> {t('appointments.book')}
+              <TabsTrigger value="book" className="flex items-center gap-1.5 flex-1">
+                <Plus className="h-4 w-4 shrink-0" />
+                <span className="hidden xs:inline sm:inline">{t('appointments.book')}</span>
+                <span className="xs:hidden sm:hidden">Book</span>
               </TabsTrigger>
             )}
-            <TabsTrigger value="my" className="flex items-center gap-2">
-              <CalendarIcon className="h-4 w-4" /> {isProvider ? 'My Appointments' : 'My Appointments'}
+            <TabsTrigger value="my" className="flex items-center gap-1.5 flex-1">
+              <CalendarIcon className="h-4 w-4 shrink-0" />
+              <span className="hidden xs:inline sm:inline">My Appointments</span>
+              <span className="xs:hidden sm:hidden">Mine</span>
               {appointments.filter(a => a.status === 'scheduled').length > 0 && (
                 <Badge variant="default" className="ml-1 text-xs h-5 px-1.5">
                   {appointments.filter(a => a.status === 'scheduled').length}
@@ -244,8 +248,10 @@ export const AppointmentScheduling: React.FC<AppointmentSchedulingProps> = ({ on
               )}
             </TabsTrigger>
             {!isProvider && (
-              <TabsTrigger value="waitlist" className="flex items-center gap-2">
-                <Bell className="h-4 w-4" /> Waitlist
+              <TabsTrigger value="waitlist" className="flex items-center gap-1.5 flex-1">
+                <Bell className="h-4 w-4 shrink-0" />
+                <span className="hidden xs:inline sm:inline">Waitlist</span>
+                <span className="xs:hidden sm:hidden">Wait</span>
                 {waitlistEntries.length > 0 && (
                   <Badge variant="secondary" className="ml-1 text-xs h-5 px-1.5">{waitlistEntries.length}</Badge>
                 )}

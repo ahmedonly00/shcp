@@ -899,7 +899,7 @@ export const DoctorPortal: React.FC<DoctorPortalProps> = ({ onNavigateToConsulta
           </DialogHeader>
           {selectedApt && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                 <div>
                   <p className="text-muted-foreground">Patient</p>
                   <p className="font-medium">{selectedApt.patientName}</p>
@@ -1243,7 +1243,7 @@ export const DoctorPortal: React.FC<DoctorPortalProps> = ({ onNavigateToConsulta
                   value={rxForm.deliveryAddress}
                   onChange={e => setRxForm(p => ({ ...p, deliveryAddress: e.target.value }))}
                 />
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <Input
                     placeholder="District"
                     value={rxForm.deliveryDistrict}

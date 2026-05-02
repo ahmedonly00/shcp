@@ -48,7 +48,7 @@ const DashboardSkeleton: React.FC = () => (
       <Skeleton className="h-4 w-48" />
     </div>
 
-    <div className="grid md:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
       {[...Array(4)].map((_, i) => (
         <Card key={i}>
           <CardContent className="pt-6">
@@ -74,7 +74,7 @@ const DashboardSkeleton: React.FC = () => (
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
             {[...Array(4)].map((_, i) => (
               <Skeleton key={i} className="h-20 rounded-lg" />
             ))}
@@ -215,7 +215,7 @@ export const PatientDashboard: React.FC = () => {
       </div>
 
       {/* Quick Stats */}
-      <div className="grid md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -297,7 +297,7 @@ export const PatientDashboard: React.FC = () => {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-3 gap-4 mb-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
               {vitals.slice(0, 6).map((vital) => (
                 <div key={vital.type} className={`p-3 rounded-lg border ${getVitalColor(vital.type)}`}>
                   <div className="flex items-center gap-2 mb-1">
@@ -417,8 +417,7 @@ export const PatientDashboard: React.FC = () => {
                   <iframe
                     title="Biker location"
                     src={`https://www.openstreetmap.org/export/embed.html?bbox=${activeDelivery.bikerLongitude - 0.018},${activeDelivery.bikerLatitude - 0.018},${activeDelivery.bikerLongitude + 0.018},${activeDelivery.bikerLatitude + 0.018}&layer=mapnik&marker=${activeDelivery.bikerLatitude},${activeDelivery.bikerLongitude}`}
-                    width="100%"
-                    height="200"
+                    className="w-full h-40 sm:h-48"
                     style={{ border: 0, display: 'block' }}
                     loading="lazy"
                   />
@@ -439,8 +438,7 @@ export const PatientDashboard: React.FC = () => {
                   <iframe
                     title="Delivery address"
                     src={`https://www.openstreetmap.org/export/embed.html?bbox=${activeDelivery.destinationLongitude - 0.018},${activeDelivery.destinationLatitude - 0.018},${activeDelivery.destinationLongitude + 0.018},${activeDelivery.destinationLatitude + 0.018}&layer=mapnik&marker=${activeDelivery.destinationLatitude},${activeDelivery.destinationLongitude}`}
-                    width="100%"
-                    height="200"
+                    className="w-full h-40 sm:h-48"
                     style={{ border: 0, display: 'block' }}
                     loading="lazy"
                   />

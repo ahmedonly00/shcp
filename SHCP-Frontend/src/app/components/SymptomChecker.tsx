@@ -115,7 +115,7 @@ const BodyMap: React.FC<BodyMapProps> = ({ onLocationSelect, selectedLocation })
     { name: 'Back',      top: '45%', left: '50%' },
   ];
   return (
-    <div className="relative h-[400px] bg-gradient-to-b from-secondary/60 to-secondary rounded-lg border-2 border-primary/20">
+    <div className="relative h-[260px] sm:h-[320px] md:h-[400px] bg-gradient-to-b from-secondary/60 to-secondary rounded-lg border-2 border-primary/20">
       <div className="absolute inset-0 flex items-center justify-center opacity-20">
         <Activity className="h-64 w-64 text-primary" />
       </div>

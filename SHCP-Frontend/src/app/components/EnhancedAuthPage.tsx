@@ -641,7 +641,7 @@ export const EnhancedAuthPage: React.FC<{ onAuthSuccess: () => void }> = ({ onAu
   }[view];
 
   return (
-    <div className="h-screen bg-secondary flex overflow-hidden">
+    <div className="min-h-screen bg-secondary flex flex-col lg:flex-row lg:h-screen lg:overflow-hidden">
       {/* Left branding panel */}
       <div className="hidden lg:flex lg:w-5/12 bg-primary p-8 flex-col justify-between text-white relative overflow-hidden">
         <div className="absolute inset-0 opacity-10">
