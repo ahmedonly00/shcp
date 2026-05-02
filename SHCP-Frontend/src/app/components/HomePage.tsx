@@ -23,7 +23,7 @@ function BrandLogo({ inverted = false }: { inverted?: boolean }) {
       </svg>
       <div>
         <span className={`text-lg font-bold block leading-tight tracking-tight ${inverted ? 'text-white' : 'text-primary'}`}>SHCP</span>
-        <span className={`text-xs font-medium ${inverted ? 'text-white/70' : 'text-muted-foreground'}`}>Rwanda Health</span>
+        <span className={`text-xs font-medium ${inverted ? 'text-white/70' : 'text-muted-foreground'}`}>Smart Health Consultation Platform</span>
       </div>
     </div>
   );

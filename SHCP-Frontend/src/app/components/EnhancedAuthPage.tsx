@@ -657,7 +657,7 @@ export const EnhancedAuthPage: React.FC<{ onAuthSuccess: () => void }> = ({ onAu
             </svg>
             <div>
               <h1 className="text-xl font-bold tracking-tight">SHCP</h1>
-              <p className="text-xs text-white/70">Rwanda Health</p>
+              <p className="text-xs text-white/70">Smart Health Consultation Platform</p>
             </div>
           </div>
           <div className="mb-6">
