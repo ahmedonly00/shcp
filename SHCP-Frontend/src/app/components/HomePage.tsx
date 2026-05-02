@@ -314,21 +314,21 @@ export const HomePage: React.FC<HomePageProps> = ({ onGetStarted }) => {
               {
                 name: 'Marie Uwase',
                 location: 'Kigali',
-                image: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=150',
+                color: 'from-blue-500 to-blue-700',
                 rating: 5,
                 text: 'I can now consult with doctors from my village without traveling to Kigali. The AI symptom checker helped me understand my condition before the consultation. Amazing service!'
               },
               {
                 name: 'Jean Baptiste Nkusi',
                 location: 'Huye',
-                image: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=150',
+                color: 'from-green-500 to-green-700',
                 rating: 5,
                 text: 'As a busy professional, this platform saves me so much time. I can book appointments, consult doctors, and manage my health records all from my phone.'
               },
               {
                 name: 'Grace Ingabire',
                 location: 'Musanze',
-                image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=150',
+                color: 'from-purple-500 to-purple-700',
                 rating: 5,
                 text: 'The doctors are professional and caring. I feel confident managing my family\'s health with this platform. The video quality is excellent even in rural areas.'
               }
@@ -342,11 +342,9 @@ export const HomePage: React.FC<HomePageProps> = ({ onGetStarted }) => {
                   </div>
                   <p className="text-foreground/80 mb-6 italic leading-relaxed">"{testimonial.text}"</p>
                   <div className="flex items-center gap-4 pt-4 border-t border-border">
-                    <ImageWithFallback
-                      src={testimonial.image}
-                      alt={testimonial.name}
-                      className="w-14 h-14 rounded-full object-cover"
-                    />
+                    <div className={`w-14 h-14 rounded-full bg-gradient-to-br ${testimonial.color} flex items-center justify-center text-white text-lg font-bold shrink-0`}>
+                      {testimonial.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                    </div>
                     <div>
                       <p className="text-primary font-bold">{testimonial.name}</p>
                       <div className="flex items-center gap-1 text-muted-foreground text-sm">
