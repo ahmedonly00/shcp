@@ -31,9 +31,11 @@ import rw.shcp.users.repository.ProviderRepository;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -141,8 +143,8 @@ public class PrescriptionService {
                 req.medications().size(),
                 saved.getPharmacy() != null ? saved.getPharmacy().getPharmacyId() : "none");
 
-        // Update patient EHR medications
-        updateEhrMedications(patient, req.medications());
+        // Rebuild patient EHR medications from all active prescriptions (deduplicates)
+        rebuildEhrMedications(patient);
 
         // Publish event — notifications fire AFTER_COMMIT so a DB rollback never triggers
         // phantom alerts. PrescriptionEventListener handles patient + pharmacist + no-pharmacy paths.
@@ -210,12 +212,47 @@ public class PrescriptionService {
         }
 
         p.setStatus(PrescriptionStatus.CANCELLED);
-        return PrescriptionDto.from(prescriptionRepository.save(p));
+        Prescription saved = prescriptionRepository.save(p);
+        rebuildEhrMedications(saved.getPatient());
+        return PrescriptionDto.from(saved);
     }
 
-    // ── EHR update ────────────────────────────────────────────────────────────
+    // ── EHR rebuild ───────────────────────────────────────────────────────────
 
-    private void updateEhrMedications(Patient patient, List<MedicationItem> newMedications) {
+    /**
+     * Rebuilds the patient's EHR medications list from every prescription that
+     * is still active (not CANCELLED / FAILED / EXPIRED and validUntil >= today).
+     * Deduplicates by medication name so the same drug from two overlapping
+     * prescriptions only appears once.
+     *
+     * Called after issuing, cancelling, or expiring a prescription so the
+     * EHR always reflects what the patient is currently supposed to be taking.
+     */
+    void rebuildEhrMedications(Patient patient) {
+        List<Prescription> activePrescriptions = prescriptionRepository
+                .findByPatient_UserIdOrderByIssuedAtDesc(patient.getUserId())
+                .stream()
+                .filter(p -> p.getStatus() != PrescriptionStatus.CANCELLED
+                          && p.getStatus() != PrescriptionStatus.FAILED
+                          && p.getStatus() != PrescriptionStatus.EXPIRED
+                          && !p.getValidUntil().isBefore(LocalDate.now()))
+                .toList();
+
+        // Merge all medication lists, deduplicate by lower-cased name (keep first occurrence)
+        Map<String, MedicationItem> deduplicated = new LinkedHashMap<>();
+        activePrescriptions.stream()
+                .flatMap(p -> {
+                    try {
+                        return objectMapper.readValue(
+                                p.getMedications(), new TypeReference<List<MedicationItem>>() {}).stream();
+                    } catch (JsonProcessingException ex) {
+                        return Stream.empty();
+                    }
+                })
+                .forEach(med -> deduplicated.putIfAbsent(med.name().toLowerCase(), med));
+
+        List<MedicationItem> merged = new ArrayList<>(deduplicated.values());
+
         HealthRecord ehr = healthRecordRepository.findByPatientUserId(patient.getUserId())
                 .orElseGet(() -> {
                     HealthRecord r = new HealthRecord();
@@ -224,26 +261,55 @@ public class PrescriptionService {
                 });
 
         try {
-            List<Map<String, Object>> existing = objectMapper.readValue(
-                    ehr.getMedications() != null ? ehr.getMedications() : "[]",
-                    new TypeReference<>() {});
-
-            List<Map<String, Object>> toAdd = objectMapper.convertValue(
-                    newMedications, new TypeReference<>() {});
-
-            List<Map<String, Object>> merged = new ArrayList<>(existing);
-            merged.addAll(toAdd);
-
             ehr.setMedications(objectMapper.writeValueAsString(merged));
             healthRecordRepository.save(ehr);
-
-            log.debug("EHR medications updated for patient={}: +{} item(s)",
-                    patient.getUserId(), newMedications.size());
+            log.debug("EHR medications rebuilt for patient={}: {} active medication(s)",
+                    patient.getUserId(), merged.size());
         } catch (JsonProcessingException e) {
-            // Non-fatal: log and continue so the prescription is still saved
-            log.warn("Failed to update EHR medications for patient={}: {}",
+            log.warn("Failed to rebuild EHR medications for patient={}: {}",
                     patient.getUserId(), e.getMessage());
         }
+    }
+
+    // ── Expiry ────────────────────────────────────────────────────────────────
+
+    /**
+     * Marks overdue prescriptions as EXPIRED and rebuilds EHR for each
+     * affected patient.  Called by {@code PrescriptionSlaJob} nightly.
+     * Only PENDING, PROCESSING, and READY_FOR_DELIVERY are targeted —
+     * PICKED_UP and ON_THE_WAY are in-flight deliveries that should complete.
+     */
+    @Transactional
+    public void expireOverdue() {
+        List<Prescription> overdue = prescriptionRepository.findExpirable(
+                List.of(PrescriptionStatus.PENDING,
+                        PrescriptionStatus.PROCESSING,
+                        PrescriptionStatus.READY_FOR_DELIVERY),
+                LocalDate.now());
+
+        if (overdue.isEmpty()) return;
+
+        log.info("Expiry job: marking {} prescription(s) as EXPIRED", overdue.size());
+
+        overdue.forEach(p -> {
+            p.setStatus(PrescriptionStatus.EXPIRED);
+            prescriptionRepository.save(p);
+            rebuildEhrMedications(p.getPatient());
+
+            // Notify patient their prescription has lapsed
+            notificationPublisher.publish(
+                    rw.shcp.notifications.NotificationEvent.push(
+                            p.getPatient().getUserId(),
+                            "prescription.expired",
+                            "Your prescription issued by Dr. " + p.getProvider().getUser().getName()
+                                    + " expired on " + p.getValidUntil()
+                                    + ". Please consult your doctor if you still need medication.",
+                            Map.of("prescriptionId", p.getPrescriptionId().toString(),
+                                   "validUntil",     p.getValidUntil().toString())));
+
+            log.info("Prescription {} expired — EHR rebuilt for patient={}",
+                    p.getPrescriptionId(), p.getPatient().getUserId());
+        });
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

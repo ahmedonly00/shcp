@@ -39,6 +39,7 @@ import java.util.UUID;
 public class PrescriptionSlaJob {
 
     private final PrescriptionRepository prescriptionRepository;
+    private final PrescriptionService    prescriptionService;
     private final PharmacyService        pharmacyService;
     private final PharmacistRepository   pharmacistRepository;
     private final UserRepository         userRepository;
@@ -46,6 +47,12 @@ public class PrescriptionSlaJob {
 
     @Value("${shcp.sla.pending-threshold-minutes:30}")
     private int pendingThresholdMinutes;
+
+    /** Runs at 01:00 every night — marks overdue prescriptions EXPIRED and prunes EHR. */
+    @Scheduled(cron = "0 0 1 * * *")
+    public void expireOverduePrescriptions() {
+        prescriptionService.expireOverdue();
+    }
 
     @Scheduled(fixedDelayString = "${shcp.sla.check-interval-ms:900000}") // default 15 min
     @Transactional

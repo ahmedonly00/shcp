@@ -7,6 +7,7 @@ import org.springframework.stereotype.Repository;
 
 import rw.shcp.common.enums.PrescriptionStatus;
 
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -23,6 +24,21 @@ public interface PrescriptionRepository extends JpaRepository<Prescription, UUID
     List<Prescription> findByPatient_UserIdAndStatus(UUID patientUserId, PrescriptionStatus status);
 
     List<Prescription> findByPharmacy_PharmacyIdOrderByCreatedAtDesc(UUID pharmacyId);
+
+    /**
+     * Finds prescriptions that have passed their valid-until date but are still
+     * in a non-terminal, non-in-flight status — used by the nightly expiry job.
+     * PICKED_UP and ON_THE_WAY are excluded because delivery is already in flight.
+     */
+    @Query("""
+            SELECT p FROM Prescription p
+            WHERE p.status IN :statuses
+              AND p.validUntil < :today
+            ORDER BY p.validUntil ASC
+            """)
+    List<Prescription> findExpirable(
+            @Param("statuses") List<PrescriptionStatus> statuses,
+            @Param("today")    LocalDate today);
 
     /**
      * Finds PENDING prescriptions assigned to a pharmacy that have not been
