@@ -8,7 +8,8 @@ import { Textarea } from '@/app/components/ui/textarea';
 import {
   Video, VideoOff, Mic, MicOff, PhoneOff, MessageSquare,
   FileText, Clock, User, Maximize, Loader2, WifiOff, Calendar as CalendarIcon, Monitor, MonitorOff,
-  Circle, Square, Send, Zap, Star, Building2, ChevronLeft, ToggleLeft, ToggleRight
+  Circle, Square, Send, Zap, Star, Building2, ChevronLeft, ToggleLeft, ToggleRight,
+  Plus, Trash2, Pill, CheckCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
@@ -16,7 +17,8 @@ import { consultationsApi } from '@/app/api/consultations';
 import { patientsApi } from '@/app/api/patients';
 import { providersApi } from '@/app/api/providers';
 import { referralsApi } from '@/app/api/referrals';
-import { ApiConsultationDto, ApiHealthRecordDto, ApiInstantAvailableProvider, ApiSymptomReport, Appointment, mapApiAppointment, isAppointmentExpired } from '@/app/types';
+import { prescriptionsApi, MedicationItem } from '@/app/api/prescriptions';
+import { ApiConsultationDto, ApiHealthRecordDto, ApiInstantAvailableProvider, ApiPrescriptionDto, ApiSymptomReport, Appointment, mapApiAppointment, isAppointmentExpired } from '@/app/types';
 import { useAuth } from '@/app/context/AuthContext';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/app/components/ui/dialog';
 
@@ -51,6 +53,21 @@ const QUALITY_PROFILES = [
   { maxBitrate: 800_000,  width: 854,  height: 480 },    // 3 — good  (480p)
   { maxBitrate: 1_500_000, width: 1280, height: 720 },   // 4 — excellent (720p)
 ] as const;
+
+const RX_TEMPLATES: Record<string, MedicationItem[]> = {
+  'Common Cold': [
+    { name: 'Paracetamol', dosage: '500mg', frequency: 'Every 6 hours', durationDays: 5 },
+    { name: 'Vitamin C',   dosage: '1000mg', frequency: 'Once daily',   durationDays: 7 },
+  ],
+  'Headache':    [{ name: 'Ibuprofen',   dosage: '400mg', frequency: 'Every 8 hours',          durationDays: 3 }],
+  'Allergies':   [{ name: 'Cetirizine',  dosage: '10mg',  frequency: 'Once daily',              durationDays: 14 }],
+  'Hypertension':[{ name: 'Amlodipine',  dosage: '5mg',   frequency: 'Once daily',              durationDays: 30 }],
+  'Diabetes':    [{ name: 'Metformin',   dosage: '500mg', frequency: 'Twice daily with meals',  durationDays: 30 }],
+  'Pain Relief': [
+    { name: 'Diclofenac', dosage: '50mg', frequency: 'Every 8 hours', durationDays: 5 },
+    { name: 'Omeprazole', dosage: '20mg', frequency: 'Once daily',     durationDays: 5 },
+  ],
+};
 
 type Phase = 'waiting' | 'connecting' | 'lobby' | 'active' | 'ended';
 
@@ -116,7 +133,7 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
   const [networkQuality, setNetworkQuality] = useState<0|1|2|3|4>(0); // 0=unknown,1=poor,4=excellent
   const [recording, setRecording] = useState(false);
   const [showConsentDialog, setShowConsentDialog] = useState(false);
-  const [activeTab, setActiveTab] = useState<'chat' | 'patient' | 'referral'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'patient' | 'referral' | 'prescription'>('chat');
 
   // ── Instant consult state ─────────────────────────────────────────────────
   const [showInstantPanel, setShowInstantPanel] = useState(false);
@@ -144,6 +161,18 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
   const [referralInstitutionContact, setReferralInstitutionContact] = useState('');
   const [submittingReferral, setSubmittingReferral] = useState(false);
   const [referralSent, setReferralSent] = useState(false);
+
+  // ── Prescription state (provider-only) ──────────────────────────────────────
+  const [rxMedications, setRxMedications] = useState<MedicationItem[]>([
+    { name: '', dosage: '', frequency: '', durationDays: 7 },
+  ]);
+  const [rxInstructions, setRxInstructions] = useState('');
+  const [rxValidDays, setRxValidDays] = useState(30);
+  const [rxDistrict, setRxDistrict] = useState('');
+  const [rxSector, setRxSector] = useState('');
+  const [rxCell, setRxCell] = useState('');
+  const [issuingRx, setIssuingRx] = useState(false);
+  const [issuedRxList, setIssuedRxList] = useState<ApiPrescriptionDto[]>([]);
 
   const [ehrSummary, setEhrSummary] = useState<ApiHealthRecordDto | null>(null);
   const [symptomReport, setSymptomReport] = useState<ApiSymptomReport | null>(null);
@@ -1061,6 +1090,47 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
     }
   };
 
+  // ─── Prescription issuance ────────────────────────────────────────────────
+
+  const handleIssuePrescription = async () => {
+    const patientId = appointment?.patientId ?? consultationRef.current?.patientId;
+    if (!patientId) { toast.error('No patient in this consultation'); return; }
+
+    const validMeds = rxMedications.filter(m => m.name.trim());
+    if (validMeds.length === 0) { toast.error('Add at least one medication'); return; }
+
+    setIssuingRx(true);
+    try {
+      const rx = await prescriptionsApi.issue({
+        consultationId: consultationRef.current?.consultationId,
+        patientId,
+        medications: validMeds,
+        instructions: rxInstructions || undefined,
+        validForDays: rxValidDays,
+        providerSignature: user?.name,
+        deliveryDistrict: rxDistrict || undefined,
+        deliverySector:   rxSector   || undefined,
+        deliveryCell:     rxCell     || undefined,
+      });
+      setIssuedRxList(prev => [rx, ...prev]);
+      toast.success(
+        rx.pharmacyName
+          ? `Prescription issued · routed to ${rx.pharmacyName}`
+          : 'Prescription issued · patient notified'
+      );
+      setRxMedications([{ name: '', dosage: '', frequency: '', durationDays: 7 }]);
+      setRxInstructions('');
+      setRxDistrict('');
+      setRxSector('');
+      setRxCell('');
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string } } };
+      toast.error(e?.response?.data?.message || 'Failed to issue prescription');
+    } finally {
+      setIssuingRx(false);
+    }
+  };
+
   // ─── Render: Ended ────────────────────────────────────────────────────────
 
   if (phase === 'ended') {
@@ -1767,6 +1837,18 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
                   <Send className="h-4 w-4" /> Refer
                 </button>
               )}
+              {isProvider && (
+                <button
+                  className={`flex-1 py-3 text-sm font-medium flex items-center justify-center gap-1.5 transition-colors ${
+                    activeTab === 'prescription'
+                      ? 'border-b-2 border-green-600 text-green-700'
+                      : 'text-muted-foreground hover:text-foreground/80'
+                  }`}
+                  onClick={() => setActiveTab('prescription')}
+                >
+                  <Pill className="h-4 w-4" /> Rx
+                </button>
+              )}
             </div>
 
             {/* Chat tab */}
@@ -2038,6 +2120,181 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
                 </Button>
               </CardContent>
             )}
+            {/* Prescription tab — provider only */}
+            {activeTab === 'prescription' && isProvider && (
+              <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
+
+                {/* Issued prescriptions for this consultation */}
+                {issuedRxList.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Issued This Session</p>
+                    {issuedRxList.map(rx => {
+                      let meds: MedicationItem[] = [];
+                      try { meds = JSON.parse(rx.medications); } catch { meds = []; }
+                      return (
+                        <div key={rx.prescriptionId} className="bg-green-50 border border-green-200 rounded-lg p-3 space-y-1">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle className="h-4 w-4 text-green-600 shrink-0" />
+                            <span className="text-xs font-semibold text-green-800">
+                              {meds.length} medication{meds.length !== 1 ? 's' : ''} · valid until {rx.validUntil}
+                            </span>
+                          </div>
+                          {meds.map((m, i) => (
+                            <p key={i} className="text-xs text-green-700 pl-6">
+                              {m.name} {m.dosage} — {m.frequency} × {m.durationDays}d
+                            </p>
+                          ))}
+                          {rx.pharmacyName && (
+                            <p className="text-xs text-green-600 pl-6 flex items-center gap-1">
+                              <Building2 className="h-3 w-3" /> Routed to: {rx.pharmacyName}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Quick templates */}
+                <div className="space-y-1.5">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Quick Templates</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {Object.entries(RX_TEMPLATES).map(([label, meds]) => (
+                      <button
+                        key={label}
+                        onClick={() => setRxMedications(meds.map(m => ({ ...m })))}
+                        className="text-xs px-2.5 py-1 rounded-full border border-primary/30 text-primary hover:bg-primary/5 transition-colors"
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Medication rows */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Medications *</p>
+                    <button
+                      onClick={() => setRxMedications(prev => [...prev, { name: '', dosage: '', frequency: '', durationDays: 7 }])}
+                      className="text-xs text-primary hover:underline flex items-center gap-1"
+                    >
+                      <Plus className="h-3 w-3" /> Add
+                    </button>
+                  </div>
+                  {rxMedications.map((med, idx) => (
+                    <div key={idx} className="border rounded-lg p-2.5 space-y-2 bg-muted/20 relative">
+                      {rxMedications.length > 1 && (
+                        <button
+                          onClick={() => setRxMedications(prev => prev.filter((_, i) => i !== idx))}
+                          className="absolute top-2 right-2 text-muted-foreground hover:text-red-500 transition-colors"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                      <input
+                        className="w-full border rounded px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+                        placeholder="Drug name (e.g. Amoxicillin)"
+                        value={med.name}
+                        onChange={e => setRxMedications(prev => prev.map((m, i) => i === idx ? { ...m, name: e.target.value } : m))}
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          className="border rounded px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+                          placeholder="Dosage (e.g. 500mg)"
+                          value={med.dosage}
+                          onChange={e => setRxMedications(prev => prev.map((m, i) => i === idx ? { ...m, dosage: e.target.value } : m))}
+                        />
+                        <input
+                          className="border rounded px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+                          placeholder="Frequency"
+                          value={med.frequency}
+                          onChange={e => setRxMedications(prev => prev.map((m, i) => i === idx ? { ...m, frequency: e.target.value } : m))}
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs text-muted-foreground whitespace-nowrap">Duration (days)</label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={365}
+                          className="w-16 border rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+                          value={med.durationDays}
+                          onChange={e => setRxMedications(prev => prev.map((m, i) => i === idx ? { ...m, durationDays: Number(e.target.value) || 1 } : m))}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Instructions */}
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Instructions</label>
+                  <textarea
+                    className="w-full border rounded-md px-2.5 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                    rows={2}
+                    placeholder="Take with food, avoid alcohol, etc."
+                    value={rxInstructions}
+                    onChange={e => setRxInstructions(e.target.value)}
+                  />
+                </div>
+
+                {/* Valid for days */}
+                <div className="flex items-center gap-3">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Valid for (days)</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={365}
+                    className="w-20 border rounded px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+                    value={rxValidDays}
+                    onChange={e => setRxValidDays(Number(e.target.value) || 30)}
+                  />
+                </div>
+
+                {/* Delivery location — used for nearest-pharmacy routing */}
+                <div className="space-y-1.5">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Delivery Location (optional)</p>
+                  <p className="text-xs text-muted-foreground/70">Used to auto-route to the nearest pharmacy with stock</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    <input
+                      className="border rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+                      placeholder="District"
+                      value={rxDistrict}
+                      onChange={e => setRxDistrict(e.target.value)}
+                    />
+                    <input
+                      className="border rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+                      placeholder="Sector"
+                      value={rxSector}
+                      onChange={e => setRxSector(e.target.value)}
+                    />
+                    <input
+                      className="border rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+                      placeholder="Cell"
+                      value={rxCell}
+                      onChange={e => setRxCell(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <Button
+                  className="w-full bg-green-600 hover:bg-green-700 text-white"
+                  onClick={handleIssuePrescription}
+                  disabled={issuingRx}
+                >
+                  {issuingRx
+                    ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Issuing…</>
+                    : <><Pill className="h-4 w-4 mr-2" />Issue Prescription</>
+                  }
+                </Button>
+
+                <p className="text-xs text-muted-foreground/70 text-center leading-relaxed">
+                  Prescription is saved to patient EHR, patient is notified, and the nearest pharmacy with stock is automatically assigned.
+                </p>
+              </CardContent>
+            )}
+
           </Card>
         </div>
       </div>
