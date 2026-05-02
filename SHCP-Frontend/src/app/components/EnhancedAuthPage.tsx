@@ -10,7 +10,7 @@ import {
   Shield, Mail, Lock, User, Phone, CheckCircle2,
   Eye, EyeOff, Hospital, Stethoscope, UserCircle, Activity,
   Calendar, Video, FileText, Heart, ArrowRight, Check, X,
-  MapPin, Plus, KeyRound
+  MapPin, KeyRound
 } from 'lucide-react';
 import { useAuth } from '@/app/context/AuthContext';
 import { UserRole } from '@/app/types';
@@ -265,30 +265,30 @@ export const EnhancedRegisterForm: React.FC<RegisterFormProps> = ({ onSuccess })
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
+    <form onSubmit={handleSubmit} className="space-y-4">
       {/* Progress bar */}
       <div className="flex items-center gap-2">
         {[1, 2, 3].map(n => (
-          <div key={n} className={`flex-1 h-2 rounded-full ${step >= n ? 'bg-primary' : 'bg-muted'}`} />
+          <div key={n} className={`flex-1 h-1.5 rounded-full ${step >= n ? 'bg-primary' : 'bg-muted'}`} />
         ))}
       </div>
 
       {/* Step 1: Role & basic info */}
       {step === 1 && (
-        <div className="space-y-5">
+        <div className="space-y-4">
           <div className="space-y-3">
             <Label className="text-sm font-medium">I am registering as</Label>
             <div className="grid grid-cols-2 gap-3">
               {[
-                { value: 'patient' as UserRole, label: t('auth.patient'), sub: t('home.features.healthRecordsDesc'), icon: <UserCircle className="h-8 w-8" /> },
-                { value: 'doctor' as UserRole, label: t('auth.doctor'), sub: t('home.features.videoConsultDesc'), icon: <Stethoscope className="h-8 w-8" /> },
+                { value: 'patient' as UserRole, label: t('auth.patient'), sub: 'Consultations, records, prescriptions', icon: <UserCircle className="h-5 w-5" /> },
+                { value: 'doctor' as UserRole, label: t('auth.doctor'), sub: 'Appointments, video consults, EHR', icon: <Stethoscope className="h-5 w-5" /> },
               ].map(opt => (
                 <button key={opt.value} type="button" onClick={() => setRole(opt.value)}
-                  className={`flex flex-col items-center gap-3 p-4 rounded-lg border-2 transition-all ${role === opt.value ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'}`}>
-                  <span className={role === opt.value ? 'text-primary' : 'text-muted-foreground/70'}>{opt.icon}</span>
-                  <div className="text-center">
-                    <p className={`text-sm font-semibold ${role === opt.value ? 'text-primary' : 'text-muted-foreground'}`}>{opt.label}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{opt.sub}</p>
+                  className={`flex items-center gap-3 p-3 rounded-lg border-2 transition-all text-left ${role === opt.value ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'}`}>
+                  <span className={`shrink-0 ${role === opt.value ? 'text-primary' : 'text-muted-foreground/60'}`}>{opt.icon}</span>
+                  <div>
+                    <p className={`text-sm font-semibold leading-none mb-0.5 ${role === opt.value ? 'text-primary' : 'text-foreground'}`}>{opt.label}</p>
+                    <p className="text-xs text-muted-foreground">{opt.sub}</p>
                   </div>
                 </button>
               ))}
@@ -300,7 +300,7 @@ export const EnhancedRegisterForm: React.FC<RegisterFormProps> = ({ onSuccess })
             { id: 'reg-email', label: 'Email Address *', field: 'email', type: 'email', placeholder: 'your.email@example.com', icon: <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground/70" /> },
             { id: 'reg-phone', label: 'Phone Number *', field: 'phone', type: 'tel', placeholder: '+250 788 123 456', icon: <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground/70" /> },
           ].map(f => (
-            <div key={f.id} className="space-y-2">
+            <div key={f.id} className="space-y-1.5">
               <Label htmlFor={f.id}>{f.label}</Label>
               <div className="relative">
                 {f.icon}
@@ -641,61 +641,68 @@ export const EnhancedAuthPage: React.FC<{ onAuthSuccess: () => void }> = ({ onAu
   }[view];
 
   return (
-    <div className="min-h-screen bg-secondary flex">
+    <div className="h-screen bg-secondary flex overflow-hidden">
       {/* Left branding panel */}
-      <div className="hidden lg:flex lg:w-1/2 bg-primary p-12 flex-col justify-between text-white relative overflow-hidden">
+      <div className="hidden lg:flex lg:w-5/12 bg-primary p-8 flex-col justify-between text-white relative overflow-hidden">
         <div className="absolute inset-0 opacity-10">
           <div className="absolute top-0 left-0 w-64 h-64 bg-white rounded-full -translate-x-32 -translate-y-32" />
           <div className="absolute bottom-0 right-0 w-96 h-96 bg-white rounded-full translate-x-32 translate-y-32" />
         </div>
         <div className="relative z-10">
-          <div className="flex items-center gap-3 mb-8">
-            <div className="h-12 w-12 bg-white rounded-xl flex items-center justify-center">
-              <Plus className="h-7 w-7 text-primary" />
-            </div>
+          <div className="flex items-center gap-3 mb-6">
+            <svg width="40" height="40" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <rect width="36" height="36" rx="9" fill="white" fillOpacity="0.2" />
+              <rect x="15.5" y="8" width="5" height="20" rx="2.5" fill="white" />
+              <rect x="8" y="15.5" width="20" height="5" rx="2.5" fill="white" />
+            </svg>
             <div>
-              <h1 className="text-2xl font-bold">SHCP</h1>
-              <p className="text-sm text-white/80">Smart Health Platform</p>
+              <h1 className="text-xl font-bold tracking-tight">SHCP</h1>
+              <p className="text-xs text-white/70">Rwanda Health</p>
             </div>
           </div>
-          <div className="mb-12">
-            <h2 className="text-4xl font-bold mb-4 leading-tight">Your Health, <br />Our Priority</h2>
-            <p className="text-lg text-white/90">Connecting patients with qualified healthcare providers across Rwanda</p>
+          <div className="mb-6">
+            <h2 className="text-3xl font-bold mb-3 leading-tight">Your Health,<br />Our Priority</h2>
+            <p className="text-sm text-white/80 leading-relaxed">Connecting patients with qualified healthcare providers across Rwanda</p>
           </div>
-          <div className="space-y-4">
+          <div className="space-y-2.5">
             {features.map((f, i) => (
-              <div key={i} className="flex items-center gap-3 bg-white/10 backdrop-blur-sm rounded-lg p-3">
-                <div className="h-10 w-10 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">{f.icon}</div>
+              <div key={i} className="flex items-center gap-3 bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2.5">
+                <div className="h-8 w-8 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                  {React.cloneElement(f.icon as React.ReactElement, { className: 'h-4 w-4' })}
+                </div>
                 <span className="text-sm font-medium">{f.text}</span>
               </div>
             ))}
           </div>
         </div>
         <div className="relative z-10">
-          <div className="flex items-center gap-6 text-sm text-white/70">
-            <span>© 2026 SHCP</span><span>•</span>
-            <a href="#" className="hover:text-white">Privacy</a><span>•</span>
+          <div className="flex items-center gap-4 text-xs text-white/60">
+            <span>© 2026 SHCP</span><span>·</span>
+            <a href="#" className="hover:text-white">Privacy</a><span>·</span>
             <a href="#" className="hover:text-white">Terms</a>
           </div>
         </div>
       </div>
 
-      {/* Right form panel */}
-      <div className="flex-1 flex items-center justify-center p-6 lg:p-12 bg-card">
-        <div className="w-full max-w-md">
-          <div className="lg:hidden text-center mb-8">
-            <div className="flex justify-center mb-4">
-              <div className="h-12 w-12 bg-primary rounded-xl flex items-center justify-center">
-                <Plus className="h-7 w-7 text-white" />
-              </div>
+      {/* Right form panel — scrolls internally if content is taller than viewport */}
+      <div className="flex-1 h-full overflow-y-auto bg-card">
+        <div className="min-h-full flex items-center justify-center p-4 lg:p-8">
+        <div className="w-full max-w-md py-4">
+          <div className="lg:hidden text-center mb-6">
+            <div className="flex justify-center mb-3">
+              <svg width="40" height="40" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <rect width="36" height="36" rx="9" fill="var(--primary)" />
+                <rect x="15.5" y="8" width="5" height="20" rx="2.5" fill="white" />
+                <rect x="8" y="15.5" width="20" height="5" rx="2.5" fill="white" />
+              </svg>
             </div>
-            <h1 className="text-2xl font-bold text-primary mb-1">SHCP</h1>
+            <h1 className="text-xl font-bold text-primary mb-1">SHCP</h1>
             <p className="text-sm text-muted-foreground">Smart Health Consultation Platform</p>
           </div>
 
           <Card className="shadow-xl border-0">
-            <CardHeader className="pb-4">
-              <CardTitle className="text-2xl">{cardTitle}</CardTitle>
+            <CardHeader className="pb-3 pt-6 px-6">
+              <CardTitle className="text-xl">{cardTitle}</CardTitle>
               <CardDescription>{cardDesc}</CardDescription>
             </CardHeader>
             <CardContent>
@@ -717,14 +724,14 @@ export const EnhancedAuthPage: React.FC<{ onAuthSuccess: () => void }> = ({ onAu
               )}
 
               {view === 'login' && (
-                <div className="mt-6 text-center text-sm">
+                <div className="mt-4 text-center text-sm">
                   <span className="text-muted-foreground">{t('auth.dontHaveAccount')} </span>
                   <button type="button" onClick={() => setView('register')}
                     className="text-primary font-medium hover:underline">{t('auth.signUp')}</button>
                 </div>
               )}
               {view === 'register' && (
-                <div className="mt-6 text-center text-sm">
+                <div className="mt-4 text-center text-sm">
                   <span className="text-muted-foreground">{t('auth.alreadyHaveAccount')} </span>
                   <button type="button" onClick={() => setView('login')}
                     className="text-primary font-medium hover:underline">{t('auth.signIn')}</button>
@@ -733,13 +740,14 @@ export const EnhancedAuthPage: React.FC<{ onAuthSuccess: () => void }> = ({ onAu
             </CardContent>
           </Card>
 
-          <div className="mt-6 text-center text-xs text-muted-foreground space-y-1">
+          <div className="mt-5 text-center text-xs text-muted-foreground space-y-1">
             <div className="flex items-center justify-center gap-1.5">
               <Shield className="h-3 w-3 text-primary/60" />
               <span>Aligned with Ministry of Health — Republic of Rwanda</span>
             </div>
             <p className="text-muted-foreground/60">Secure · Private · HIPAA-Compliant</p>
           </div>
+        </div>
         </div>
       </div>
     </div>
