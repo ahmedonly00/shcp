@@ -74,8 +74,11 @@ spring:
   # ── File uploads ──────────────────────────────────────────
   servlet:
     multipart:
-      max-file-size: 10MB
-      max-request-size: 20MB
+      # EHR document uploads are small; consultation recordings can be
+      # 200-400 MB for a 30-60 min WebRTC session at moderate bitrate.
+      # 500 MB cap acts as a DoS guard while allowing full-session recordings.
+      max-file-size: 500MB
+      max-request-size: 510MB
 
 # ── Server ────────────────────────────────────────────────────
 server:

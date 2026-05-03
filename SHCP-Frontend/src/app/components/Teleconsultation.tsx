@@ -193,6 +193,21 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
   const iceConfigRef = useRef<RTCConfiguration>(STUN_ONLY_CONFIG);
   // Previous network-stats sample — used to compute per-interval deltas, not cumulative totals
   const prevStatsRef = useRef<{ packetsLost: number; packetsReceived: number } | null>(null);
+  // Prevents two concurrent ICE restarts from racing and corrupting signaling state
+  const iceRestartingRef = useRef(false);
+
+  // Auto-save consultation notes to localStorage so they survive a network
+  // failure at end-of-call. Key includes the consultation ID so notes from
+  // different sessions don't collide. Cleared on successful end().
+  useEffect(() => {
+    const consultId = consultationRef.current?.consultationId;
+    if (!consultId || !isProvider) return;
+    if (consultationNotes) {
+      localStorage.setItem(`shcp_notes_${consultId}`, consultationNotes);
+    } else {
+      localStorage.removeItem(`shcp_notes_${consultId}`);
+    }
+  }, [consultationNotes, isProvider]);
 
   // Call duration timer
   useEffect(() => {
@@ -366,9 +381,13 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
    * delay when the state is 'disconnected'.
    */
   const triggerIceRestart = useCallback(async () => {
+    // Guard: only one ICE restart at a time — two concurrent restarts
+    // would race on setLocalDescription and corrupt the signaling state.
+    if (iceRestartingRef.current) return;
     const pc  = peerConnRef.current;
     const rid = remotePeerSocketIdRef.current;
     if (!pc || !rid || pc.signalingState === 'closed') return;
+    iceRestartingRef.current = true;
     try {
       const offer = await pc.createOffer({ iceRestart: true });
       await pc.setLocalDescription(offer);
@@ -376,6 +395,8 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
       addSystemMessage('Network interrupted — attempting ICE restart…');
     } catch {
       /* ICE restart failed; connection will remain degraded until manual rejoin */
+    } finally {
+      iceRestartingRef.current = false;
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -743,6 +764,13 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
     updatePhase('connecting');
     try {
       consultationRef.current = consultation;
+      if (isProvider) {
+        const savedNotes = localStorage.getItem(`shcp_notes_${consultation.consultationId}`);
+        if (savedNotes) {
+          setConsultationNotes(savedNotes);
+          toast.info('Restored unsaved notes from previous session.', { duration: 4000 });
+        }
+      }
       iceConfigRef.current = await fetchIceServers(consultation.consultationId);
       await getUserMedia();
       connectSocket(consultation.roomId);
@@ -801,6 +829,15 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
         throw new Error('No room ID returned from backend');
       }
       consultationRef.current = consultation;
+
+      // Restore any unsaved notes from a previous session for this consultation
+      if (isProvider) {
+        const savedNotes = localStorage.getItem(`shcp_notes_${consultation.consultationId}`);
+        if (savedNotes) {
+          setConsultationNotes(savedNotes);
+          toast.info('Restored unsaved notes from previous session.', { duration: 4000 });
+        }
+      }
 
       // 1. (deferred) Fetch TURN credentials now that we have a consultationId
       iceConfigRef.current = await fetchIceServers(consultation.consultationId);
@@ -862,11 +899,15 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
       consultationsApi.logAuditEvent(consultationRef.current.consultationId, 'LEFT');
     }
 
-    // Notify backend
+    // Notify backend; on success clear the localStorage draft, on failure
+    // the localStorage copy survives and can be recovered in a later session.
     if (callEndApi && consultationRef.current) {
-      consultationsApi.end(consultationRef.current.consultationId, {
+      const consultId = consultationRef.current.consultationId;
+      consultationsApi.end(consultId, {
         notes: consultationNotes || undefined,
-      }).catch(() => { /* best-effort */ });
+      }).then(() => {
+        localStorage.removeItem(`shcp_notes_${consultId}`);
+      }).catch(() => { /* best-effort — localStorage draft preserved for recovery */ });
     }
   }, [consultationNotes]);
 
