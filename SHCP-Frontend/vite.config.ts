@@ -88,15 +88,14 @@ export default defineConfig({
         ],
       },
       devOptions: {
-        // Enable PWA in development for testing
-        enabled: true,
+        enabled: false,
       },
     }),
   ],
   resolve: {
     alias: {
-      // Alias @ to the src directory
       '@': path.resolve(__dirname, './src'),
     },
+    dedupe: ['react', 'react-dom'],
   },
 })
