@@ -44,6 +44,13 @@ export interface Appointment {
   slotId?: string;
 }
 
+export interface ExplainingFactor {
+  symptom:      string;
+  contribution: number;
+  direction:    'positive' | 'negative';
+  present:      boolean;
+}
+
 export interface SymptomCheck {
   id: string;
   userId: string;
@@ -59,6 +66,7 @@ export interface SymptomCheck {
     recommendation: 'self-care' | 'routine' | 'urgent' | 'emergency';
     details: string;
     isDegraded?: boolean;
+    isLowConfidence?: boolean;
     specialistType?: string | null;
     selfCareTips?: string[];
     followUpDays?: number | null;
@@ -66,6 +74,9 @@ export interface SymptomCheck {
     topPredictions?: Array<{ disease: string; probability: number }>;
     /** ICD-10 code for the top-1 prediction, e.g. "B54". */
     icd10?: string | null;
+    /** SHAP-based top-5 symptoms driving the prediction. */
+    explainingFactors?: ExplainingFactor[];
+    modelVersion?: string;
   };
 }
 
@@ -219,6 +230,10 @@ export interface ApiSymptomReport {
   followUpDays?: number | null;
   /** Top-3 differential predictions from the AI model. */
   top3Predictions?: Array<{ disease: string; probability: number }>;
+  /** SHAP-based top-5 symptoms driving the prediction. */
+  explaining_factors?: ExplainingFactor[];
+  /** Version string of the model that produced this result, e.g. "RandomForest-v2". */
+  model_version?: string;
   disclaimer: string;
   /** Set when Flask returned NO_SYMPTOMS_DETECTED or LOW_CONFIDENCE. */
   message?: string;
@@ -464,6 +479,7 @@ export function mapApiAppointment(a: ApiAppointmentDto): Appointment {
 
 /** Map ApiSymptomReport → frontend SymptomCheck */
 export function mapApiSymptomReport(r: ApiSymptomReport): SymptomCheck {
+  const isLowConfidence = r.aiUrgency === 'UNKNOWN' && !r.isDegraded;
   return {
     id: r.reportId,
     userId: r.patientId,
@@ -478,11 +494,14 @@ export function mapApiSymptomReport(r: ApiSymptomReport): SymptomCheck {
       recommendation: fromBackendRecommendation(r.aiUrgency),
       details: r.careRecommendation,
       isDegraded: r.isDegraded,
+      isLowConfidence,
       specialistType: r.specialistType ?? null,
       selfCareTips: r.selfCareTips ?? [],
       followUpDays: r.followUpDays ?? null,
       topPredictions: r.top3Predictions ?? [],
       icd10: r.icd10 ?? null,
+      explainingFactors: r.explaining_factors ?? [],
+      modelVersion: r.model_version,
     },
   };
 }

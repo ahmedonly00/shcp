@@ -10,11 +10,11 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import {
   Activity, AlertCircle, Search, MapPin, Calendar,
   CheckCircle, XCircle, AlertTriangle, FileText, Plus, Loader2,
-  Stethoscope, ClipboardList, Clock, Download
+  Stethoscope, ClipboardList, Clock, Download, Phone, ChevronDown, ChevronUp, Brain
 } from 'lucide-react';
 import { symptomsApi } from '@/app/api/symptoms';
 import { patientsApi } from '@/app/api/patients';
-import { SymptomCheck, mapApiSymptomReport, mapApiSymptomReportSummary } from '@/app/types';
+import { SymptomCheck, ExplainingFactor, mapApiSymptomReport, mapApiSymptomReportSummary } from '@/app/types';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
 
@@ -101,31 +101,61 @@ function downloadAssessmentReport(check: SymptomCheck) {
 
 interface BodyMapProps { onLocationSelect: (l: string) => void; selectedLocation: string; }
 
+const BODY_PARTS: { name: string; cx: number; cy: number; rx: number; ry: number }[] = [
+  { name: 'Head',       cx: 100, cy: 38,  rx: 22,  ry: 26  },
+  { name: 'Neck',       cx: 100, cy: 72,  rx: 12,  ry: 10  },
+  { name: 'Chest',      cx: 100, cy: 110, rx: 34,  ry: 28  },
+  { name: 'Abdomen',    cx: 100, cy: 155, rx: 30,  ry: 22  },
+  { name: 'Left Arm',   cx: 53,  cy: 118, rx: 12,  ry: 30  },
+  { name: 'Right Arm',  cx: 147, cy: 118, rx: 12,  ry: 30  },
+  { name: 'Left Leg',   cx: 80,  cy: 220, rx: 16,  ry: 40  },
+  { name: 'Right Leg',  cx: 120, cy: 220, rx: 16,  ry: 40  },
+  { name: 'Back',       cx: 100, cy: 135, rx: 34,  ry: 32  },
+];
+
 const BodyMap: React.FC<BodyMapProps> = ({ onLocationSelect, selectedLocation }) => {
   const { t } = useTranslation();
-  const parts = [
-    { name: 'Head',      top: '5%',  left: '50%' },
-    { name: 'Neck',      top: '15%', left: '50%' },
-    { name: 'Chest',     top: '25%', left: '50%' },
-    { name: 'Abdomen',   top: '35%', left: '50%' },
-    { name: 'Left Arm',  top: '25%', left: '25%' },
-    { name: 'Right Arm', top: '25%', left: '75%' },
-    { name: 'Left Leg',  top: '55%', left: '40%' },
-    { name: 'Right Leg', top: '55%', left: '60%' },
-    { name: 'Back',      top: '45%', left: '50%' },
-  ];
   return (
-    <div className="relative h-[260px] sm:h-[320px] md:h-[400px] bg-gradient-to-b from-secondary/60 to-secondary rounded-lg border-2 border-primary/20">
-      <div className="absolute inset-0 flex items-center justify-center opacity-20">
-        <Activity className="h-64 w-64 text-primary" />
+    <div className="flex flex-col sm:flex-row gap-4 items-center">
+      {/* SVG figure */}
+      <div className="flex-shrink-0">
+        <svg viewBox="0 0 200 280" width="160" height="224" aria-label="Body map">
+          {/* silhouette */}
+          <ellipse cx="100" cy="38"  rx="22" ry="26" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-muted-foreground/30" />
+          <rect    x="88"  y="63"  width="24" height="18" rx="6"  fill="none" stroke="currentColor" strokeWidth="1.5" className="text-muted-foreground/30" />
+          <rect    x="66"  y="82"  width="68" height="56" rx="8"  fill="none" stroke="currentColor" strokeWidth="1.5" className="text-muted-foreground/30" />
+          <rect    x="70"  y="136" width="60" height="44" rx="6"  fill="none" stroke="currentColor" strokeWidth="1.5" className="text-muted-foreground/30" />
+          <rect    x="41"  y="84"  width="23" height="60" rx="10" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-muted-foreground/30" />
+          <rect    x="136" y="84"  width="23" height="60" rx="10" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-muted-foreground/30" />
+          <rect    x="64"  y="182" width="32" height="80" rx="12" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-muted-foreground/30" />
+          <rect    x="104" y="182" width="32" height="80" rx="12" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-muted-foreground/30" />
+          {/* clickable zones */}
+          {BODY_PARTS.map(p => (
+            <ellipse key={p.name} cx={p.cx} cy={p.cy} rx={p.rx} ry={p.ry}
+              className="cursor-pointer transition-all"
+              fill={selectedLocation === p.name ? 'hsl(var(--primary))' : 'transparent'}
+              fillOpacity={selectedLocation === p.name ? 0.25 : 0}
+              stroke={selectedLocation === p.name ? 'hsl(var(--primary))' : 'transparent'}
+              strokeWidth="2"
+              onClick={() => onLocationSelect(p.name)}>
+              <title>{t(`symptoms.step2.parts.${p.name}`, p.name)}</title>
+            </ellipse>
+          ))}
+        </svg>
       </div>
-      {parts.map(part => (
-        <button key={part.name} onClick={() => onLocationSelect(part.name)}
-          className={`absolute transform -translate-x-1/2 -translate-y-1/2 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${selectedLocation === part.name ? 'bg-primary text-primary-foreground shadow-lg scale-110' : 'bg-card text-foreground/80 hover:bg-primary/10 hover:scale-105'}`}
-          style={{ top: part.top, left: part.left }}>
-          {t(`symptoms.step2.parts.${part.name}`, part.name)}
-        </button>
-      ))}
+      {/* label buttons */}
+      <div className="flex flex-wrap sm:flex-col gap-2 justify-center">
+        {BODY_PARTS.map(p => (
+          <button key={p.name} onClick={() => onLocationSelect(p.name)}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all border ${
+              selectedLocation === p.name
+                ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+                : 'bg-card text-foreground/70 border-border hover:bg-primary/10 hover:border-primary/40'
+            }`}>
+            {t(`symptoms.step2.parts.${p.name}`, p.name)}
+          </button>
+        ))}
+      </div>
     </div>
   );
 };
@@ -152,6 +182,7 @@ export const SymptomChecker: React.FC<{ onNavigateToAppointments: () => void }> 
   const [showPreviousDialog, setShowPreviousDialog] = useState(false);
   const [selectedPrevious, setSelectedPrevious] = useState<SymptomCheck | null>(null);
   const [language, setLanguage] = useState<'en' | 'fr' | 'rw'>(i18n.language as 'en' | 'fr' | 'rw' || 'en');
+  const [showFactors, setShowFactors] = useState(false);
 
   useEffect(() => {
     patientsApi.getMySymptomReports(0, 10)
@@ -194,7 +225,7 @@ export const SymptomChecker: React.FC<{ onNavigateToAppointments: () => void }> 
         symptomText,
         symptoms: selectedSymptoms,
         severity,
-        duration,
+        duration: duration || undefined,
         language,
         bodyMapData: normalizedLocation ? { [normalizedLocation]: true } : undefined,
       });
@@ -477,9 +508,24 @@ export const SymptomChecker: React.FC<{ onNavigateToAppointments: () => void }> 
             <CardHeader>
               <div className="flex items-start gap-4">
                 {getRecommendationIcon(assessment.aiAssessment.recommendation)}
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   <CardTitle>{t('symptoms.result.title')}</CardTitle>
                   <CardDescription>{t('symptoms.result.subtitle')}</CardDescription>
+                </div>
+                <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                  <Badge variant="outline" className="text-xs capitalize font-semibold">
+                    {assessment.aiAssessment.recommendation}
+                  </Badge>
+                  {assessment.aiAssessment.confidence > 0 && (
+                    <span className="text-xs text-muted-foreground font-mono">
+                      {Math.round(assessment.aiAssessment.confidence)}% confidence
+                    </span>
+                  )}
+                  {assessment.aiAssessment.modelVersion && (
+                    <span className="text-[10px] text-muted-foreground/50">
+                      {assessment.aiAssessment.modelVersion}
+                    </span>
+                  )}
                 </div>
               </div>
             </CardHeader>
@@ -541,6 +587,67 @@ export const SymptomChecker: React.FC<{ onNavigateToAppointments: () => void }> 
                 </div>
               )}
 
+              {/* ── Low confidence notice ── */}
+              {assessment.aiAssessment.isLowConfidence && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                  <div className="text-sm">
+                    <p className="font-medium text-amber-900">Low AI confidence</p>
+                    <p className="text-xs text-amber-700 mt-0.5">
+                      The AI could not reach a confident diagnosis from the symptoms provided.
+                      Add more specific symptoms or describe them in more detail for a better result.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* ── SHAP explaining factors ── */}
+              {(assessment.aiAssessment.explainingFactors?.length ?? 0) > 0 && (
+                <div className="border rounded-lg overflow-hidden">
+                  <button
+                    className="w-full flex items-center justify-between px-4 py-3 bg-muted/40 hover:bg-muted/60 transition-colors text-sm font-medium"
+                    onClick={() => setShowFactors(f => !f)}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Brain className="h-4 w-4 text-primary" />
+                      Why this diagnosis?
+                    </div>
+                    {showFactors ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                  </button>
+                  {showFactors && (
+                    <div className="px-4 py-3 space-y-2.5">
+                      <p className="text-xs text-muted-foreground mb-1">
+                        Top symptoms influencing this prediction (SHAP values):
+                      </p>
+                      {assessment.aiAssessment.explainingFactors!.map((f: ExplainingFactor, i: number) => (
+                        <div key={i} className="space-y-0.5">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="flex items-center gap-1.5">
+                              <span className={`inline-block w-2 h-2 rounded-full ${f.direction === 'positive' ? 'bg-green-500' : 'bg-red-400'}`} />
+                              <span className={f.present ? 'font-medium text-foreground' : 'text-muted-foreground'}>
+                                {f.symptom.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                              </span>
+                              {!f.present && (
+                                <span className="text-[10px] text-muted-foreground/60 italic">(not reported)</span>
+                              )}
+                            </span>
+                            <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded ${f.direction === 'positive' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
+                              {f.direction === 'positive' ? '+' : ''}{f.contribution.toFixed(3)}
+                            </span>
+                          </div>
+                          <div className="w-full bg-muted rounded-full h-1">
+                            <div
+                              className={`h-1 rounded-full ${f.direction === 'positive' ? 'bg-green-500' : 'bg-red-400'}`}
+                              style={{ width: `${Math.min(100, Math.abs(f.contribution) * 300)}%` }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* ── What to do ── */}
               <div>
                 <h4 className="font-semibold mb-2">{t('symptoms.result.whatToDo')}</h4>
@@ -597,15 +704,25 @@ export const SymptomChecker: React.FC<{ onNavigateToAppointments: () => void }> 
               </div>
 
               {/* ── Actions ── */}
-              <div className="flex gap-2">
-                <Button variant="outline" className="flex-1" onClick={() => downloadAssessmentReport(assessment)}>
-                  <Download className="mr-2 h-4 w-4" />{t('symptoms.result.downloadReport')}
-                </Button>
-                {assessment.aiAssessment.recommendation !== 'self-care' && (
-                  <Button className="flex-1" onClick={onNavigateToAppointments}>
-                    <Calendar className="mr-2 h-4 w-4" />{t('symptoms.result.bookAppointment')}
-                  </Button>
+              <div className="flex flex-col gap-2">
+                {assessment.aiAssessment.recommendation === 'emergency' && (
+                  <a href="tel:912" className="w-full">
+                    <Button className="w-full bg-red-600 hover:bg-red-700 text-white">
+                      <Phone className="mr-2 h-4 w-4" />
+                      Call Emergency Services — 912
+                    </Button>
+                  </a>
                 )}
+                <div className="flex gap-2">
+                  <Button variant="outline" className="flex-1" onClick={() => downloadAssessmentReport(assessment)}>
+                    <Download className="mr-2 h-4 w-4" />{t('symptoms.result.downloadReport')}
+                  </Button>
+                  {assessment.aiAssessment.recommendation === 'urgent' || assessment.aiAssessment.recommendation === 'routine' ? (
+                    <Button className="flex-1" onClick={onNavigateToAppointments}>
+                      <Calendar className="mr-2 h-4 w-4" />{t('symptoms.result.bookAppointment')}
+                    </Button>
+                  ) : null}
+                </div>
               </div>
             </CardContent>
           </Card>
