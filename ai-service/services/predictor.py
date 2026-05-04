@@ -7,73 +7,73 @@ prediction + urgency classification for a given symptom vector.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import pickle
 from datetime import datetime, timezone
-from typing import Any
 
 import numpy as np
 
 from app.services.pathway import determine_pathway
 
+logger = logging.getLogger(__name__)
+
 # ── paths ──────────────────────────────────────────────────────────────────────
 _BASE_DIR   = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _MODELS_DIR = os.path.join(_BASE_DIR, "models")
 
+# ── model version (written by training/train_model.py on each retrain) ────────
+def _read_model_version() -> str:
+    path = os.path.join(_MODELS_DIR, "model_version.json")
+    try:
+        with open(path) as f:
+            return json.load(f).get("version", "RandomForest-v2")
+    except FileNotFoundError:
+        return "RandomForest-v2"
+
+MODEL_VERSION = _read_model_version()
+
+# ── SHAP (optional — degrades gracefully if not installed) ────────────────────
+try:
+    import shap as _shap
+    _SHAP_AVAILABLE = True
+except ImportError:
+    _SHAP_AVAILABLE = False
+    logger.warning("shap not installed — explaining_factors will be empty. Run: pip install shap")
+
 # ── lazy-loaded globals (populated on first predict() call) ───────────────────
-_clf              = None
-_le               = None
-_symptom_columns  = None
-_urgency_map      = None
-_loaded           = False
+_clf             = None
+_le              = None
+_symptom_columns = None
+_urgency_map     = None
+_explainer       = None
+_loaded          = False
 
 
-def _load_models():
-    global _clf, _le, _symptom_columns, _urgency_map, _loaded
+def _load_models() -> None:
+    global _clf, _le, _symptom_columns, _urgency_map, _explainer, _loaded
     if _loaded:
         return
 
-    model_path   = os.path.join(_MODELS_DIR, "disease_classifier.pkl")
-    enc_path     = os.path.join(_MODELS_DIR, "label_encoder.pkl")
-    cols_path    = os.path.join(_MODELS_DIR, "symptom_columns.json")
-    urgency_path = os.path.join(_MODELS_DIR, "urgency_map.json")
-
-    with open(model_path, "rb") as f:
+    with open(os.path.join(_MODELS_DIR, "disease_classifier.pkl"), "rb") as f:
         _clf = pickle.load(f)
-    with open(enc_path, "rb") as f:
+    with open(os.path.join(_MODELS_DIR, "label_encoder.pkl"), "rb") as f:
         _le = pickle.load(f)
-    with open(cols_path) as f:
+    with open(os.path.join(_MODELS_DIR, "symptom_columns.json")) as f:
         _symptom_columns = json.load(f)
-    with open(urgency_path) as f:
+    with open(os.path.join(_MODELS_DIR, "urgency_map.json")) as f:
         _urgency_map = json.load(f)
+
+    if _SHAP_AVAILABLE:
+        try:
+            _explainer = _shap.TreeExplainer(_clf)
+        except Exception as exc:
+            logger.warning("SHAP explainer init failed: %s", exc)
 
     _loaded = True
 
 
 # ── care messages ──────────────────────────────────────────────────────────────
-_CARE_MESSAGES = {
-    "EMERGENCY": (
-        "Your symptoms may indicate a life-threatening condition. "
-        "Go to the nearest emergency room immediately or call emergency services."
-    ),
-    "URGENT": (
-        "Your symptoms need medical attention today. "
-        "Book an urgent teleconsultation with a doctor now."
-    ),
-    "ROUTINE": (
-        "Your symptoms should be evaluated by a doctor within 1–3 days. "
-        "Schedule a consultation at your convenience."
-    ),
-    "SELF_CARE": (
-        "Your symptoms can likely be managed at home. "
-        "Follow self-care guidelines and monitor for worsening symptoms. "
-        "See a doctor if symptoms persist beyond 3 days."
-    ),
-    "UNKNOWN": (
-        "Unable to assess urgency. Please consult a healthcare provider directly."
-    ),
-}
-
 _PATHWAY_MAP = {
     "EMERGENCY": "emergency",
     "URGENT":    "teleconsult",
@@ -91,8 +91,39 @@ _DISCLAIMER = (
 # ── helpers ────────────────────────────────────────────────────────────────────
 
 def _to_symptom_dicts(symptoms: list[str]) -> list[dict]:
-    """Convert canonical symptom strings to AIAnalysisResponse.symptoms contract."""
     return [{"name": s, "severity": None, "duration": None} for s in symptoms]
+
+
+def _explain(X: np.ndarray, class_idx: int, top_n: int = 5) -> list[dict]:
+    """Return the top-N symptoms driving the prediction via SHAP TreeExplainer."""
+    if not _SHAP_AVAILABLE or _explainer is None or _symptom_columns is None:
+        return []
+    try:
+        sv_raw = _explainer.shap_values(X)
+        # sklearn RF multi-class: list[ndarray], each element shape (n_samples, n_features)
+        if isinstance(sv_raw, list):
+            vals = sv_raw[class_idx][0]
+        else:
+            # newer shap: 3-D array (n_samples, n_features, n_classes)
+            vals = sv_raw[0, :, class_idx]
+
+        indices = np.argsort(np.abs(vals))[-top_n:][::-1]
+        return [
+            {
+                "symptom":      _symptom_columns[i],
+                "contribution": round(float(vals[i]), 4),
+                "direction":    "positive" if vals[i] > 0 else "negative",
+                "present":      bool(int(X[0, i])),
+            }
+            for i in indices
+        ]
+    except Exception as exc:
+        logger.warning("SHAP explanation failed: %s", exc)
+        return []
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 # ── public API ─────────────────────────────────────────────────────────────────
@@ -117,7 +148,7 @@ def predict(
         sex               : "male" | "female" | "other" (from profile)
 
     Returns:
-        dict with status, disease, confidence, urgency, pathway, etc.
+        dict with status, disease, icd10, confidence, urgency, explaining_factors, etc.
     """
     _load_models()
 
@@ -125,7 +156,7 @@ def predict(
     X = np.array(symptom_vector, dtype=int).reshape(1, -1)
 
     # ── 2. probabilities + top-3 ─────────────────────────────────────────────
-    proba       = _clf.predict_proba(X)[0]
+    proba        = _clf.predict_proba(X)[0]
     top3_indices = np.argsort(proba)[-3:][::-1]
 
     disease_name = _le.inverse_transform([top3_indices[0]])[0]
@@ -140,7 +171,7 @@ def predict(
     ]
 
     # ── 3. hard safety overrides (applied regardless of confidence) ──────────
-    symptom_set = set(detected_symptoms)
+    symptom_set      = set(detected_symptoms)
     override_urgency: str | None = None
 
     # Neonatal / infant (<1 year, age==0): any fever or breathing difficulty is
@@ -207,10 +238,9 @@ def predict(
         override_urgency = "EMERGENCY"
 
     if override_urgency:
-        # Look up ICD-10 for the predicted disease even during a safety override
-        _entry  = _urgency_map.get(disease_name, {})
-        _icd10  = _entry.get("icd10") if isinstance(_entry, dict) else None
-        pw = determine_pathway(override_urgency, detected_symptoms, age=age)
+        _entry = _urgency_map.get(disease_name, {})
+        _icd10 = _entry.get("icd10") if isinstance(_entry, dict) else None
+        pw     = determine_pathway(override_urgency, detected_symptoms, age=age)
         return {
             "status":              "OK",
             "disease":             disease_name,
@@ -224,21 +254,20 @@ def predict(
             "self_care_tips":      pw.self_care_tips,
             "follow_up_days":      pw.follow_up_days,
             "top_3_predictions":   top3,
+            "explaining_factors":  _explain(X, int(top3_indices[0])),
             "detected_symptoms":   detected_symptoms,
             "symptom_count":       len(detected_symptoms),
             "patient_age":         age,
             "patient_sex":         sex,
+            "model_version":       MODEL_VERSION,
             "disclaimer":          _DISCLAIMER,
             "processed_at":        _now(),
         }
 
     # ── 4. low-confidence early return ───────────────────────────────────────
     if confidence < 40.0:
-        # Still resolve ICD-10 and urgency for the top prediction so the frontend
-        # can show the differential diagnosis bars even at low confidence.
         _entry   = _urgency_map.get(disease_name, {})
         _icd10   = _entry.get("icd10") if isinstance(_entry, dict) else None
-        _urgency = _entry.get("urgency", "ROUTINE") if isinstance(_entry, dict) else "ROUTINE"
         return {
             "status":              "LOW_CONFIDENCE",
             "disease":             disease_name,
@@ -253,27 +282,27 @@ def predict(
                 "Try adding more specific symptoms or describing them in more detail. "
                 "Consult a healthcare provider for a proper diagnosis."
             ),
-            "message":             (
+            "message": (
                 "Add more symptoms or describe them in detail for a more "
                 "accurate AI assessment."
             ),
-            "top_3_predictions":   top3,
-            "detected_symptoms":   detected_symptoms,
-            "symptom_count":       len(detected_symptoms),
-            "disclaimer":          _DISCLAIMER,
-            "processed_at":        _now(),
+            "top_3_predictions":  top3,
+            "explaining_factors": [],
+            "detected_symptoms":  detected_symptoms,
+            "symptom_count":      len(detected_symptoms),
+            "model_version":      MODEL_VERSION,
+            "disclaimer":         _DISCLAIMER,
+            "processed_at":       _now(),
         }
 
     # ── 5. urgency + ICD-10 from map ─────────────────────────────────────────
-    # urgency_map values are now dicts: {"urgency": "...", "icd10": "..."}
     disease_entry = _urgency_map.get(disease_name, {})
     if isinstance(disease_entry, dict):
-        urgency  = disease_entry.get("urgency", "ROUTINE")
-        icd10    = disease_entry.get("icd10")
+        urgency = disease_entry.get("urgency", "ROUTINE")
+        icd10   = disease_entry.get("icd10")
     else:
-        # Backwards-compat: plain string values still work
-        urgency  = disease_entry if disease_entry else "ROUTINE"
-        icd10    = None
+        urgency = disease_entry if disease_entry else "ROUTINE"
+        icd10   = None
 
     # ── 6. severity hint adjustments (never override safety-critical levels) ──
     if severity_hint == "severe" and urgency == "ROUTINE":
@@ -284,42 +313,28 @@ def predict(
         urgency = "ROUTINE"
 
     # ── 7. duration hint adjustments ─────────────────────────────────────────
-    # Chronic symptoms (>2 weeks) that aren't already urgent → keep routine;
-    # Acute onset (<1 day) that is currently ROUTINE → escalate to URGENT
     if duration_hint == "less-than-1-day" and urgency == "ROUTINE":
         urgency = "URGENT"
     elif duration_hint == "more-than-2-weeks" and urgency == "URGENT":
         urgency = "ROUTINE"
 
-    # ── 8. age/sex-aware adjustments (never override safety levels) ───────────
-    #
-    # Older patients (≥65) have higher baseline risk for cardiovascular and
-    # respiratory conditions — escalate if the current urgency is still low.
-    # Threshold per ACEP Geriatric Emergency Department Guidelines (65+).
+    # ── 8. age/sex-aware adjustments (never override safety levels) ──────────
     if age is not None and age >= 65:
         if "chest_pain" in symptom_set and urgency in ("ROUTINE", "SELF_CARE"):
             urgency = "URGENT"
         if "breathlessness" in symptom_set and urgency == "SELF_CARE":
             urgency = "ROUTINE"
-        # Dizziness in elderly → fall risk and possible cardiac/neurological cause
         if "dizziness" in symptom_set and urgency == "SELF_CARE":
             urgency = "ROUTINE"
 
-    # Young children (<5) are at higher risk from high fever and dehydration.
-    # Infants (<1 year, age==0) with fever/breathlessness are already handled
-    # as hard EMERGENCY overrides in step 3 above.
     if age is not None and 0 < age < 5:
         if "high_fever" in symptom_set and urgency == "ROUTINE":
             urgency = "URGENT"
         if "dehydration" in symptom_set and urgency in ("ROUTINE", "SELF_CARE"):
             urgency = "URGENT"
 
-    # Female patients have higher rates of atypical cardiac presentation:
-    # fatigue + nausea + sweating without classic chest pain can still be
-    # cardiac — escalate from SELF_CARE to ROUTINE so a provider reviews it.
     if sex == "female":
-        cardiac_atypical = {"fatigue", "nausea", "sweating"}
-        if cardiac_atypical.issubset(symptom_set) and urgency == "SELF_CARE":
+        if {"fatigue", "nausea", "sweating"}.issubset(symptom_set) and urgency == "SELF_CARE":
             urgency = "ROUTINE"
 
     # ── 9. build response ─────────────────────────────────────────────────────
@@ -337,14 +352,12 @@ def predict(
         "self_care_tips":      pw.self_care_tips,
         "follow_up_days":      pw.follow_up_days,
         "top_3_predictions":   top3,
+        "explaining_factors":  _explain(X, int(top3_indices[0])),
         "detected_symptoms":   detected_symptoms,
         "symptom_count":       len(detected_symptoms),
         "patient_age":         age,
         "patient_sex":         sex,
+        "model_version":       MODEL_VERSION,
         "disclaimer":          _DISCLAIMER,
         "processed_at":        _now(),
     }
-
-
-def _now() -> str:
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
