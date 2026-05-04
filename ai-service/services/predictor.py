@@ -143,57 +143,74 @@ def predict(
     symptom_set = set(detected_symptoms)
     override_urgency: str | None = None
 
+    # Neonatal / infant (<1 year, age==0): any fever or breathing difficulty is
+    # a medical emergency. AAP/AAFP: fever ≥38°C in infants <3 months requires
+    # immediate emergency evaluation; age==0 covers the full 0–11-month range.
+    if age is not None and age == 0:
+        if "high_fever" in symptom_set or "mild_fever" in symptom_set:
+            override_urgency = "EMERGENCY"
+        elif "breathlessness" in symptom_set:
+            override_urgency = "EMERGENCY"
+
     # Cardiac: chest pain + breathlessness or cardiac arrest pattern
-    if "chest_pain" in symptom_set and "breathlessness" in symptom_set:
+    if override_urgency is None and (
+        "chest_pain" in symptom_set and "breathlessness" in symptom_set
+    ):
         override_urgency = "EMERGENCY"
-    elif (
+    if override_urgency is None and (
         "chest_pain" in symptom_set
         and "fast_heart_rate" in symptom_set
         and "sweating" in symptom_set
     ):
         override_urgency = "EMERGENCY"
     # Neuro: altered consciousness, coma, or meningitis
-    elif "altered_sensorium" in symptom_set or "coma" in symptom_set:
+    if override_urgency is None and (
+        "altered_sensorium" in symptom_set or "coma" in symptom_set
+    ):
         override_urgency = "EMERGENCY"
-    elif "high_fever" in symptom_set and "stiff_neck" in symptom_set:
+    if override_urgency is None and (
+        "high_fever" in symptom_set and "stiff_neck" in symptom_set
+    ):
         override_urgency = "EMERGENCY"
     # Stroke: sudden-onset severe headache + vision/speech/weakness cluster
-    elif (
+    if override_urgency is None and (
         "headache" in symptom_set
         and "blurred_and_distorted_vision" in symptom_set
         and "weakness_in_limbs" in symptom_set
     ):
         override_urgency = "EMERGENCY"
     # Anaphylaxis: rash + swelling + breathlessness
-    elif (
+    if override_urgency is None and (
         "skin_rash" in symptom_set
         and "breathlessness" in symptom_set
         and "swollen_extremeties" in symptom_set
     ):
         override_urgency = "EMERGENCY"
     # Sepsis: high fever + altered sensorium + fast heart rate
-    elif (
+    if override_urgency is None and (
         "high_fever" in symptom_set
         and "fast_heart_rate" in symptom_set
         and "altered_sensorium" in symptom_set
     ):
         override_urgency = "EMERGENCY"
     # Pulmonary embolism: chest pain + breathlessness + swollen legs
-    elif (
+    if override_urgency is None and (
         "chest_pain" in symptom_set
         and "breathlessness" in symptom_set
         and "swollen_legs" in symptom_set
     ):
         override_urgency = "EMERGENCY"
     # Severe dehydration with altered consciousness
-    elif "dehydration" in symptom_set and "altered_sensorium" in symptom_set:
+    if override_urgency is None and (
+        "dehydration" in symptom_set and "altered_sensorium" in symptom_set
+    ):
         override_urgency = "EMERGENCY"
 
     if override_urgency:
         # Look up ICD-10 for the predicted disease even during a safety override
         _entry  = _urgency_map.get(disease_name, {})
         _icd10  = _entry.get("icd10") if isinstance(_entry, dict) else None
-        pw = determine_pathway(override_urgency, detected_symptoms)
+        pw = determine_pathway(override_urgency, detected_symptoms, age=age)
         return {
             "status":              "OK",
             "disease":             disease_name,
@@ -276,16 +293,22 @@ def predict(
 
     # ── 8. age/sex-aware adjustments (never override safety levels) ───────────
     #
-    # Older patients (≥60) have higher baseline risk for cardiovascular and
+    # Older patients (≥65) have higher baseline risk for cardiovascular and
     # respiratory conditions — escalate if the current urgency is still low.
-    if age is not None and age >= 60:
+    # Threshold per ACEP Geriatric Emergency Department Guidelines (65+).
+    if age is not None and age >= 65:
         if "chest_pain" in symptom_set and urgency in ("ROUTINE", "SELF_CARE"):
             urgency = "URGENT"
         if "breathlessness" in symptom_set and urgency == "SELF_CARE":
             urgency = "ROUTINE"
+        # Dizziness in elderly → fall risk and possible cardiac/neurological cause
+        if "dizziness" in symptom_set and urgency == "SELF_CARE":
+            urgency = "ROUTINE"
 
     # Young children (<5) are at higher risk from high fever and dehydration.
-    if age is not None and age < 5:
+    # Infants (<1 year, age==0) with fever/breathlessness are already handled
+    # as hard EMERGENCY overrides in step 3 above.
+    if age is not None and 0 < age < 5:
         if "high_fever" in symptom_set and urgency == "ROUTINE":
             urgency = "URGENT"
         if "dehydration" in symptom_set and urgency in ("ROUTINE", "SELF_CARE"):
@@ -300,7 +323,7 @@ def predict(
             urgency = "ROUTINE"
 
     # ── 9. build response ─────────────────────────────────────────────────────
-    pw = determine_pathway(urgency, detected_symptoms)
+    pw = determine_pathway(urgency, detected_symptoms, age=age)
     return {
         "status":              "OK",
         "disease":             disease_name,
