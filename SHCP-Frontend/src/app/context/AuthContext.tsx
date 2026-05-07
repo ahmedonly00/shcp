@@ -5,6 +5,17 @@ import { notificationsApi } from '@/app/api/notifications';
 import { requestNotificationToken, signInWithGoogle } from '@/firebase';
 import { AxiosError } from 'axios';
 
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+/** "john.patient" → "John Patient",  "jane_doe" → "Jane Doe",  "Alice" → "Alice" */
+function formatDisplayName(raw: string): string {
+  return raw
+    .split(/[.\-_\s]+/)
+    .filter(Boolean)
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ');
+}
+
 // ─── Context shape ──────────────────────────────────────────────────────────
 
 interface RegisterData {
@@ -87,7 +98,7 @@ function buildUser(data: {
   return {
     id: data.userId,
     email: data.email,
-    name: data.name || data.email.split('@')[0],
+    name: formatDisplayName(data.name || data.email.split('@')[0]),
     role: fromBackendRole(data.role as 'PATIENT' | 'PROVIDER' | 'ADMIN' | 'PHARMACIST' | 'BIKER'),
     verified: data.isVerified,
     profileComplete: data.profileComplete ?? true,

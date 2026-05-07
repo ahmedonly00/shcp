@@ -60,6 +60,8 @@ export interface SymptomCheck {
   duration: string;
   bodyLocation?: string;
   language?: string;
+  /** True once the patient has submitted doctor-confirmation feedback */
+  feedbackSubmitted?: boolean;
   aiAssessment: {
     possibleConditions: string[];
     confidence: number;

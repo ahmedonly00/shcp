@@ -129,8 +129,8 @@
     },
     "features": {
       "title": "Everything You Need for Better Health",
-      "aiDiagnosis": "AI-Powered Diagnosis",
-      "aiDiagnosisDesc": "Get instant symptom analysis powered by advanced AI technology",
+      "aiDiagnosis": "AI Symptom Screening",
+      "aiDiagnosisDesc": "Describe your symptoms and get instant AI-powered screening — a starting point, not a diagnosis",
       "videoConsult": "Video Consultations",
       "videoConsultDesc": "Connect face-to-face with certified healthcare professionals",
       "healthRecords": "Health Records",
@@ -326,7 +326,7 @@
   },
   "symptoms": {
     "title": "Symptom Checker",
-    "subtitle": "Get preliminary health assessment powered by AI",
+    "subtitle": "AI-powered preliminary screening — not a medical diagnosis",
     "newAssessment": "New Assessment",
     "language": "Language",
     "enterSymptoms": "Describe your symptoms...",
@@ -368,9 +368,15 @@
       "back": "Back",
       "continue": "Continue",
       "parts": {
-        "Head": "Head", "Neck": "Neck", "Chest": "Chest",
-        "Abdomen": "Abdomen", "Left Arm": "Left Arm", "Right Arm": "Right Arm",
-        "Left Leg": "Left Leg", "Right Leg": "Right Leg", "Back": "Back"
+        "Head": "Head",
+        "Neck": "Neck",
+        "Chest": "Chest",
+        "Abdomen": "Abdomen",
+        "Left Arm": "Left Arm",
+        "Right Arm": "Right Arm",
+        "Left Leg": "Left Leg",
+        "Right Leg": "Right Leg",
+        "Back": "Back"
       }
     },
     "step3": {
@@ -392,14 +398,14 @@
       "summarySeverity": "Severity",
       "summaryDuration": "Duration",
       "back": "Back",
-      "getAssessment": "Get AI Assessment"
+      "getAssessment": "Screen My Symptoms"
     },
     "loading": {
       "title": "Analyzing Your Symptoms",
       "desc": "Our AI is processing your information..."
     },
     "result": {
-      "title": "AI Assessment Result",
+      "title": "Screening Result",
       "subtitle": "Preliminary screening — not a medical diagnosis",
       "differential": "Possible Conditions (AI Differential)",
       "lowConfidenceNote": "AI service offline — showing basic assessment",
@@ -413,7 +419,9 @@
       "bookAppointment": "Book Appointment",
       "scheduleDoctor": "Schedule Appointment with Doctor",
       "toastCompleted": "AI assessment completed",
-      "toastUnavailable": "AI service temporarily unavailable — showing basic assessment"
+      "toastUnavailable": "AI service temporarily unavailable — showing basic assessment",
+      "screeningNote": "Confidence reflects how closely your symptoms match known patterns — not diagnostic certainty.",
+      "confidence": "match"
     },
     "previous": {
       "title": "Previous Assessments",
@@ -427,11 +435,20 @@
       "selfCare": "Self-care tips",
       "reportedSymptoms": "Reported Symptoms",
       "possibleCondition": "Possible Condition",
-      "download": "Download This Report"
+      "download": "Download This Report",
+      "feedbackTitle": "Did a doctor confirm this screening?",
+      "feedbackYes": "Yes, confirmed",
+      "feedbackNo": "No, different diagnosis",
+      "feedbackNotYet": "Not seen a doctor yet",
+      "feedbackDoctorLabel": "What did the doctor say?",
+      "feedbackDoctorPlaceholder": "e.g. Malaria, Typhoid...",
+      "feedbackSubmit": "Submit Feedback",
+      "feedbackThanks": "Thank you — your feedback helps improve the AI",
+      "feedbackHelps": "Your answer helps make the AI more accurate for everyone"
     },
     "disclaimer": {
       "title": "Important Disclaimer",
-      "text": "This AI assessment is for informational purposes only and should not replace professional medical advice. Always consult with a qualified healthcare provider for proper diagnosis and treatment."
+      "text": "This tool performs symptom pattern screening only — it cannot replace a clinical examination, laboratory tests, or a qualified doctor's diagnosis. Always consult a licensed healthcare provider before making any health decisions."
     },
     "severity": {
       "low": "Low",
@@ -560,7 +577,7 @@
     "earnings": "Earnings",
     "totalEarnings": "Total earnings all time",
     "todayAppointments": "Today's Appointments",
-    "completedAppointments": "Completed Appointments",
+    "completedAppointments": "completed appointments",
     "availability": "Availability Calendar",
     "setAvailability": "Set Availability",
     "weeklySchedule": "Set Weekly Schedule",
@@ -582,7 +599,6 @@
     "noSlotsOnDate": "No slots on this date",
     "unblock": "Unblock",
     "block": "Block",
-    "completedAppointments": "completed appointments",
     "prescriptionTemplates": "Quick Prescription Templates",
     "viewDetails": "View Details"
   },

@@ -129,8 +129,8 @@
     },
     "features": {
       "title": "Ibyo Ukeneye Byose kuri Ubuzima Bwiza",
-      "aiDiagnosis": "Isuzuma Rishingiye kuri AI",
-      "aiDiagnosisDesc": "Boneka isesengura ry'ibimenyetso byihuse rishingiye kuri tekinoloji nziza ya AI",
+      "aiDiagnosis": "Isuzuma ry'Ibimenyetso rya AI",
+      "aiDiagnosisDesc": "Sobanura ibimenyetso byawe ubone isuzuma ryihuse rya AI — intangiriro, si isuzuma ry'ubuvuzi",
       "videoConsult": "Inama za Video",
       "videoConsultDesc": "Huza imbonankubone n'inzobere z'ubuzima zemejwe",
       "healthRecords": "Inyandiko z'Ubuzima",
@@ -326,7 +326,7 @@
   },
   "symptoms": {
     "title": "Genzura Ibimenyetso",
-    "subtitle": "Boneka isuzuma ry'ubuzima ry'ibanze rishingiye kuri AI",
+    "subtitle": "Isuzuma ry'ibanze rishingiye kuri AI — si isuzuma ry'ubuvuzi",
     "newAssessment": "Isuzuma Rishya",
     "language": "Ururimi",
     "enterSymptoms": "Sobanura ibimenyetso byawe...",
@@ -368,9 +368,15 @@
       "back": "Subira",
       "continue": "Komeza",
       "parts": {
-        "Head": "Umutwe", "Neck": "Ijosi", "Chest": "Igituza",
-        "Abdomen": "Inda", "Left Arm": "Ukuboko kw'Ibumoso", "Right Arm": "Ukuboko kw'Iburyo",
-        "Left Leg": "Ukuguru kw'Ibumoso", "Right Leg": "Ukuguru kw'Iburyo", "Back": "Umugongo"
+        "Head": "Umutwe",
+        "Neck": "Ijosi",
+        "Chest": "Igituza",
+        "Abdomen": "Inda",
+        "Left Arm": "Ukuboko kw'Ibumoso",
+        "Right Arm": "Ukuboko kw'Iburyo",
+        "Left Leg": "Ukuguru kw'Ibumoso",
+        "Right Leg": "Ukuguru kw'Iburyo",
+        "Back": "Umugongo"
       }
     },
     "step3": {
@@ -392,14 +398,14 @@
       "summarySeverity": "Uburemere",
       "summaryDuration": "Igihe",
       "back": "Subira",
-      "getAssessment": "Boneka Isuzuma rya AI"
+      "getAssessment": "Suzuma Ibimenyetso Byanjye"
     },
     "loading": {
       "title": "Gusesengura Ibimenyetso Byawe",
       "desc": "AI yacu isesengura amakuru yawe..."
     },
     "result": {
-      "title": "Ibisubizo by'Isuzuma rya AI",
+      "title": "Ibisubizo by'Isuzuma",
       "subtitle": "Isuzuma ry'ibanze — si isuzuma ry'ubuvuzi",
       "differential": "Indwara Zishoboka (Isesengura rya AI)",
       "lowConfidenceNote": "Serivisi ya AI ntikora — ibisubizo by'ibanze biragaragara",
@@ -413,7 +419,9 @@
       "bookAppointment": "Teganya Gahunda",
       "scheduleDoctor": "Teganya Gahunda n'Umuganga",
       "toastCompleted": "Isuzuma rya AI rirarangiye",
-      "toastUnavailable": "Serivisi ya AI ntiboneka by'agateganyo — ibisubizo by'ibanze biragaragara"
+      "toastUnavailable": "Serivisi ya AI ntiboneka by'agateganyo — ibisubizo by'ibanze biragaragara",
+      "screeningNote": "Urwego rw'ikizere rugaragaza uko ibimenyetso byawe bihuye n'imiterere izwi — si icyemezo cy'isuzuma ry'ubuvuzi.",
+      "confidence": "ihura"
     },
     "previous": {
       "title": "Isuzuma Ryakozwe Mbere",
@@ -427,11 +435,20 @@
       "selfCare": "Inama zo kwiyitaho",
       "reportedSymptoms": "Ibimenyetso Byatanzwe",
       "possibleCondition": "Indwara Ishoboka",
-      "download": "Pakurura Iyi Raporo"
+      "download": "Pakurura Iyi Raporo",
+      "feedbackTitle": "Umuganga yemeje iri suzuma?",
+      "feedbackYes": "Yego, yemeje",
+      "feedbackNo": "Oya, isuzuma ryabaye ritandukanye",
+      "feedbackNotYet": "Ntabwo nabonye umuganga",
+      "feedbackDoctorLabel": "Umuganga yavuze iki?",
+      "feedbackDoctorPlaceholder": "urugero: Malariya, Tifoide...",
+      "feedbackSubmit": "Ohereza Ibitekerezo",
+      "feedbackThanks": "Murakoze — ibitekerezo byawe bifasha kongerera ubushobozi AI",
+      "feedbackHelps": "Igisubizo cyawe gifasha AI kuba nziza kuruta kuri bose"
     },
     "disclaimer": {
       "title": "Intangazo Ry'Ingenzi",
-      "text": "Iri suzuma rya AI ni iry'amakuru gusa kandi ntirishobora gusimbura inama y'umuganga. Baza inzobere y'ubuzima buri gihe kugira ngo ubone isuzuma n'ubuvuzi bwiza."
+      "text": "Iki gikoresho gisuzuma gusa imiterere y'ibimenyetso — ntigishobora gusimbura isuzuma ry'ubuvuzi, ibikorwa bya laboratoire, cyangwa isuzuma ry'umuganga ubishoboye. Baza inzobere y'ubuzima buri gihe mbere yo gufata ibyemezo bijyanye n'ubuzima bwawe."
     },
     "severity": {
       "low": "Yoroheje",
@@ -560,7 +577,7 @@
     "earnings": "Inyungu",
     "totalEarnings": "Inyungu zose z'igihe cyose",
     "todayAppointments": "Gahunda z'Uyu Munsi",
-    "completedAppointments": "Gahunda Zarangiye",
+    "completedAppointments": "gahunda zisozwe",
     "availability": "Kalendari y'Ubushobozi",
     "setAvailability": "Shyiraho Ubushobozi",
     "weeklySchedule": "Gahunda y'Icyumweru",
@@ -582,7 +599,6 @@
     "noSlotsOnDate": "Nta bihe kuri iyi tariki",
     "unblock": "Fungura",
     "block": "Funga",
-    "completedAppointments": "gahunda zisozwe",
     "prescriptionTemplates": "Inyandiko z'Inibibi Byihuse",
     "viewDetails": "Reba Amakuru"
   },

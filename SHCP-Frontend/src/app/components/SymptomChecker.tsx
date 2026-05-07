@@ -10,9 +10,10 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import {
   Activity, AlertCircle, Search, MapPin, Calendar,
   CheckCircle, XCircle, AlertTriangle, FileText, Plus, Loader2,
-  Stethoscope, ClipboardList, Clock, Download, Phone, ChevronDown, ChevronUp, Brain
+  Stethoscope, ClipboardList, Clock, Download, Phone, ChevronDown, ChevronUp, Brain,
+  ThumbsUp, ThumbsDown, HelpCircle
 } from 'lucide-react';
-import { symptomsApi } from '@/app/api/symptoms';
+import { symptomsApi, FeedbackInput } from '@/app/api/symptoms';
 import { patientsApi } from '@/app/api/patients';
 import { SymptomCheck, ExplainingFactor, mapApiSymptomReport, mapApiSymptomReportSummary } from '@/app/types';
 import { toast } from 'sonner';
@@ -99,7 +100,7 @@ function downloadAssessmentReport(check: SymptomCheck) {
   if (win) { win.document.write(html); win.document.close(); }
 }
 
-interface BodyMapProps { onLocationSelect: (l: string) => void; selectedLocation: string; }
+interface BodyMapProps { onLocationSelect: (l: string) => void; selectedLocations: string[]; }
 
 const BODY_PARTS: { name: string; cx: number; cy: number; rx: number; ry: number }[] = [
   { name: 'Head',       cx: 100, cy: 38,  rx: 22,  ry: 26  },
@@ -113,7 +114,7 @@ const BODY_PARTS: { name: string; cx: number; cy: number; rx: number; ry: number
   { name: 'Back',       cx: 100, cy: 135, rx: 34,  ry: 32  },
 ];
 
-const BodyMap: React.FC<BodyMapProps> = ({ onLocationSelect, selectedLocation }) => {
+const BodyMap: React.FC<BodyMapProps> = ({ onLocationSelect, selectedLocations }) => {
   const { t } = useTranslation();
   return (
     <div className="flex flex-col sm:flex-row gap-4 items-center">
@@ -133,9 +134,9 @@ const BodyMap: React.FC<BodyMapProps> = ({ onLocationSelect, selectedLocation })
           {BODY_PARTS.map(p => (
             <ellipse key={p.name} cx={p.cx} cy={p.cy} rx={p.rx} ry={p.ry}
               className="cursor-pointer transition-all"
-              fill={selectedLocation === p.name ? 'hsl(var(--primary))' : 'transparent'}
-              fillOpacity={selectedLocation === p.name ? 0.25 : 0}
-              stroke={selectedLocation === p.name ? 'hsl(var(--primary))' : 'transparent'}
+              fill={selectedLocations.includes(p.name) ? 'hsl(var(--primary))' : 'transparent'}
+              fillOpacity={selectedLocations.includes(p.name) ? 0.25 : 0}
+              stroke={selectedLocations.includes(p.name) ? 'hsl(var(--primary))' : 'transparent'}
               strokeWidth="2"
               onClick={() => onLocationSelect(p.name)}>
               <title>{t(`symptoms.step2.parts.${p.name}`, p.name)}</title>
@@ -148,7 +149,7 @@ const BodyMap: React.FC<BodyMapProps> = ({ onLocationSelect, selectedLocation })
         {BODY_PARTS.map(p => (
           <button key={p.name} onClick={() => onLocationSelect(p.name)}
             className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all border ${
-              selectedLocation === p.name
+              selectedLocations.includes(p.name)
                 ? 'bg-primary text-primary-foreground border-primary shadow-sm'
                 : 'bg-card text-foreground/70 border-border hover:bg-primary/10 hover:border-primary/40'
             }`}>
@@ -164,15 +165,15 @@ export const SymptomChecker: React.FC<{ onNavigateToAppointments: () => void }> 
   const [step, setStep] = useState(1);
   const { t, i18n } = useTranslation();
   const appLang = React.useRef(i18n.language);
-  React.useEffect(() => { setLanguage(i18n.language as 'en' | 'fr' | 'rw'); }, [i18n.language]);
   // Restore the app language when the patient leaves the symptom checker
   React.useEffect(() => {
     return () => { i18n.changeLanguage(appLang.current); };
-  }, [i18n]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
   const [customSymptom, setCustomSymptom] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [bodyLocation, setBodyLocation] = useState('');
+  const [bodyLocations, setBodyLocations] = useState<string[]>([]);
   const [severity, setSeverity] = useState<'mild' | 'moderate' | 'severe'>('mild');
   const [duration, setDuration] = useState('');
   const [assessment, setAssessment] = useState<SymptomCheck | null>(null);
@@ -181,8 +182,11 @@ export const SymptomChecker: React.FC<{ onNavigateToAppointments: () => void }> 
   const [previousReports, setPreviousReports] = useState<SymptomCheck[]>([]);
   const [showPreviousDialog, setShowPreviousDialog] = useState(false);
   const [selectedPrevious, setSelectedPrevious] = useState<SymptomCheck | null>(null);
-  const [language, setLanguage] = useState<'en' | 'fr' | 'rw'>(i18n.language as 'en' | 'fr' | 'rw' || 'en');
   const [showFactors, setShowFactors] = useState(false);
+  const [feedbackChoice, setFeedbackChoice] = useState<'yes' | 'no' | null>(null);
+  const [doctorDiagnosis, setDoctorDiagnosis] = useState('');
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
+  const [feedbackDone, setFeedbackDone] = useState<string | null>(null); // report id that has feedback
 
   useEffect(() => {
     patientsApi.getMySymptomReports(0, 10)
@@ -194,6 +198,9 @@ export const SymptomChecker: React.FC<{ onNavigateToAppointments: () => void }> 
 
   const toggleSymptom = (s: string) =>
     setSelectedSymptoms(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
+
+  const toggleBodyLocation = (loc: string) =>
+    setBodyLocations(prev => prev.includes(loc) ? prev.filter(x => x !== loc) : [...prev, loc]);
 
   const addCustomSymptom = () => {
     const sym = customSymptom.trim();
@@ -211,23 +218,23 @@ export const SymptomChecker: React.FC<{ onNavigateToAppointments: () => void }> 
 
     const symptomText = [
       ...selectedSymptoms,
-      bodyLocation ? `located in ${bodyLocation}` : '',
+      bodyLocations.length ? `located in ${bodyLocations.join(', ')}` : '',
       `severity: ${severity}`,
       duration ? `duration: ${duration}` : '',
     ].filter(Boolean).join(', ');
 
     try {
       setProgress(50);
-      const normalizedLocation = bodyLocation
-        ? bodyLocation.toLowerCase().replace(/^(left|right)\s+/, '')
-        : null;
+      const bodyMapData = bodyLocations.length
+        ? Object.fromEntries(bodyLocations.map(l => [l.toLowerCase().replace(/^(left|right)\s+/, ''), true]))
+        : undefined;
       const result = await symptomsApi.analyze({
         symptomText,
         symptoms: selectedSymptoms,
         severity,
         duration: duration || undefined,
-        language,
-        bodyMapData: normalizedLocation ? { [normalizedLocation]: true } : undefined,
+        language: i18n.language as 'en' | 'fr' | 'rw',
+        bodyMapData,
       });
       setProgress(100);
       const mapped = mapApiSymptomReport(result);
@@ -242,7 +249,7 @@ export const SymptomChecker: React.FC<{ onNavigateToAppointments: () => void }> 
         symptoms: selectedSymptoms,
         severity,
         duration,
-        bodyLocation,
+        bodyLocation: bodyLocations.join(', '),
         aiAssessment: {
           possibleConditions: [],
           confidence: 0,
@@ -259,9 +266,8 @@ export const SymptomChecker: React.FC<{ onNavigateToAppointments: () => void }> 
   };
 
   const resetChecker = () => {
-    setStep(1); setSelectedSymptoms([]); setBodyLocation('');
+    setStep(1); setSelectedSymptoms([]); setBodyLocations([]);
     setSeverity('mild'); setDuration(''); setAssessment(null); setProgress(0);
-    setLanguage(i18n.language as 'en' | 'fr' | 'rw');
   };
 
   const getRecommendationIcon = (rec: string) => {
@@ -288,12 +294,8 @@ export const SymptomChecker: React.FC<{ onNavigateToAppointments: () => void }> 
         </div>
         <div className="flex items-center gap-2">
           <Select
-            value={language}
-            onValueChange={(v) => {
-              const lang = v as typeof language;
-              setLanguage(lang);
-              i18n.changeLanguage(lang);
-            }}
+            value={i18n.language}
+            onValueChange={(v) => i18n.changeLanguage(v)}
           >
             <SelectTrigger className="w-40">
               <SelectValue />
@@ -408,11 +410,11 @@ export const SymptomChecker: React.FC<{ onNavigateToAppointments: () => void }> 
               <>
                 <div className="space-y-2">
                   <Label>{t('symptoms.step2.selectLocation')}</Label>
-                  <BodyMap selectedLocation={bodyLocation} onLocationSelect={setBodyLocation} />
-                  {bodyLocation && (
+                  <BodyMap selectedLocations={bodyLocations} onLocationSelect={toggleBodyLocation} />
+                  {bodyLocations.length > 0 && (
                     <div className="flex items-center gap-2 text-sm text-primary mt-2">
                       <MapPin className="h-4 w-4" />
-                      <span>{t('symptoms.step2.selectedLocation', { location: t(`symptoms.step2.parts.${bodyLocation}`, bodyLocation) })}</span>
+                      <span>{bodyLocations.map(l => t(`symptoms.step2.parts.${l}`, l)).join(', ')}</span>
                     </div>
                   )}
                 </div>
@@ -465,8 +467,8 @@ export const SymptomChecker: React.FC<{ onNavigateToAppointments: () => void }> 
                   <h4 className="font-medium text-foreground mb-2">{t('symptoms.step3.summaryTitle')}</h4>
                   <ul className="space-y-1 text-sm text-foreground/80">
                     <li>• {t('symptoms.step3.summarySymptoms')}: {selectedSymptoms.map(s => t(`symptoms.commonList.${s}`, formatSymptomName(s))).join(', ')}</li>
-                    {bodyLocation && (
-                      <li>• {t('symptoms.step3.summaryLocation')}: {t(`symptoms.step2.parts.${bodyLocation}`, bodyLocation)}</li>
+                    {bodyLocations.length > 0 && (
+                      <li>• {t('symptoms.step3.summaryLocation')}: {bodyLocations.map(l => t(`symptoms.step2.parts.${l}`, l)).join(', ')}</li>
                     )}
                     <li>• {t('symptoms.step3.summarySeverity')}: {severity.charAt(0).toUpperCase() + severity.slice(1)}</li>
                     {duration && (
@@ -517,8 +519,8 @@ export const SymptomChecker: React.FC<{ onNavigateToAppointments: () => void }> 
                     {assessment.aiAssessment.recommendation}
                   </Badge>
                   {assessment.aiAssessment.confidence > 0 && (
-                    <span className="text-xs text-muted-foreground font-mono">
-                      {Math.round(assessment.aiAssessment.confidence)}% confidence
+                    <span className="text-xs text-muted-foreground font-mono" title={t('symptoms.result.screeningNote')}>
+                      {Math.round(assessment.aiAssessment.confidence)}% {t('symptoms.result.confidence', 'match')}
                     </span>
                   )}
                   {assessment.aiAssessment.modelVersion && (
@@ -566,6 +568,9 @@ export const SymptomChecker: React.FC<{ onNavigateToAppointments: () => void }> 
                   {assessment.aiAssessment.isDegraded && (
                     <p className="text-xs text-amber-600 mt-1">{t('symptoms.result.lowConfidenceNote')}</p>
                   )}
+                  <p className="text-xs text-muted-foreground/70 mt-2 italic">
+                    {t('symptoms.result.screeningNote')}
+                  </p>
                 </div>
               ) : assessment.aiAssessment.isDegraded ? (
                 <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-2">
@@ -736,7 +741,13 @@ export const SymptomChecker: React.FC<{ onNavigateToAppointments: () => void }> 
                   {previousReports.map(r => (
                     <div key={r.id}
                       className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 cursor-pointer"
-                      onClick={() => { setSelectedPrevious(r); setShowPreviousDialog(true); }}>
+                      onClick={() => {
+                        setSelectedPrevious(r);
+                        setShowPreviousDialog(true);
+                        setFeedbackChoice(null);
+                        setDoctorDiagnosis('');
+                        setFeedbackDone(r.feedbackSubmitted ? r.id : null);
+                      }}>
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <Badge variant="outline" className="text-xs capitalize">{r.severity}</Badge>
@@ -884,6 +895,80 @@ export const SymptomChecker: React.FC<{ onNavigateToAppointments: () => void }> 
                   </div>
                 </div>
               )}
+
+              {/* Feedback */}
+              <div className="border rounded-lg p-4 space-y-3 bg-muted/30">
+                {feedbackDone === selectedPrevious.id ? (
+                  <div className="flex items-center gap-2 text-sm text-green-700">
+                    <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
+                    <span className="font-medium">{t('symptoms.previous.feedbackThanks')}</span>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-sm font-medium">{t('symptoms.previous.feedbackTitle')}</p>
+                    <p className="text-xs text-muted-foreground">{t('symptoms.previous.feedbackHelps')}</p>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm" variant={feedbackChoice === 'yes' ? 'default' : 'outline'}
+                        className="flex-1 gap-1.5"
+                        onClick={() => setFeedbackChoice('yes')}
+                      >
+                        <ThumbsUp className="h-3.5 w-3.5" />
+                        {t('symptoms.previous.feedbackYes')}
+                      </Button>
+                      <Button
+                        size="sm" variant={feedbackChoice === 'no' ? 'default' : 'outline'}
+                        className="flex-1 gap-1.5"
+                        onClick={() => setFeedbackChoice('no')}
+                      >
+                        <ThumbsDown className="h-3.5 w-3.5" />
+                        {t('symptoms.previous.feedbackNo')}
+                      </Button>
+                    </div>
+                    {feedbackChoice === 'no' && (
+                      <div className="space-y-1">
+                        <label className="text-xs text-muted-foreground">{t('symptoms.previous.feedbackDoctorLabel')}</label>
+                        <Input
+                          value={doctorDiagnosis}
+                          onChange={e => setDoctorDiagnosis(e.target.value)}
+                          placeholder={t('symptoms.previous.feedbackDoctorPlaceholder')}
+                          className="text-sm"
+                        />
+                      </div>
+                    )}
+                    {feedbackChoice && (
+                      <Button
+                        size="sm" className="w-full"
+                        disabled={feedbackSubmitting}
+                        onClick={async () => {
+                          setFeedbackSubmitting(true);
+                          try {
+                            const body: FeedbackInput = {
+                              wasCorrect: feedbackChoice === 'yes',
+                              doctorDiagnosis: feedbackChoice === 'no' && doctorDiagnosis.trim()
+                                ? doctorDiagnosis.trim() : undefined,
+                            };
+                            await symptomsApi.submitFeedback(selectedPrevious.id, body);
+                            setFeedbackDone(selectedPrevious.id);
+                            setPreviousReports(prev => prev.map(r =>
+                              r.id === selectedPrevious.id ? { ...r, feedbackSubmitted: true } : r
+                            ));
+                          } catch {
+                            toast.error('Could not save feedback. Please try again.');
+                          } finally {
+                            setFeedbackSubmitting(false);
+                          }
+                        }}
+                      >
+                        {feedbackSubmitting
+                          ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+                          : <HelpCircle className="h-3.5 w-3.5 mr-1" />}
+                        {t('symptoms.previous.feedbackSubmit')}
+                      </Button>
+                    )}
+                  </>
+                )}
+              </div>
 
               {/* Download */}
               <Button variant="outline" className="w-full mt-2" onClick={() => downloadAssessmentReport(selectedPrevious)}>

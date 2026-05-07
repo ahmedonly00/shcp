@@ -10,10 +10,18 @@ export interface SymptomInput {
   bodyMapData?: Record<string, boolean>;
 }
 
+export interface FeedbackInput {
+  wasCorrect: boolean;
+  doctorDiagnosis?: string;
+}
+
 export const symptomsApi = {
   analyze: (data: SymptomInput) =>
     apiClient.post<ApiSymptomReport>('/symptoms/analyze', data).then(unwrap<ApiSymptomReport>),
 
   getReport: (reportId: string) =>
     apiClient.get<ApiSymptomReport>(`/symptoms/reports/${reportId}`).then(unwrap<ApiSymptomReport>),
+
+  submitFeedback: (reportId: string, data: FeedbackInput) =>
+    apiClient.post(`/symptoms/reports/${reportId}/feedback`, data).then(unwrap),
 };

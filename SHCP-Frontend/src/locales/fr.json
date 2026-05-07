@@ -129,8 +129,8 @@
     },
     "features": {
       "title": "Tout ce dont vous avez besoin pour une meilleure santé",
-      "aiDiagnosis": "Diagnostic assisté par IA",
-      "aiDiagnosisDesc": "Obtenez une analyse instantanée de vos symptômes grâce à une IA avancée",
+      "aiDiagnosis": "Dépistage IA des Symptômes",
+      "aiDiagnosisDesc": "Décrivez vos symptômes et obtenez un dépistage IA instantané — un point de départ, pas un diagnostic",
       "videoConsult": "Consultations vidéo",
       "videoConsultDesc": "Connectez-vous face à face avec des professionnels de santé certifiés",
       "healthRecords": "Dossiers médicaux",
@@ -326,7 +326,7 @@
   },
   "symptoms": {
     "title": "Vérificateur de symptômes",
-    "subtitle": "Obtenez une évaluation de santé préliminaire basée sur l'IA",
+    "subtitle": "Dépistage préliminaire assisté par IA — pas un diagnostic médical",
     "newAssessment": "Nouvelle évaluation",
     "language": "Langue",
     "enterSymptoms": "Décrivez vos symptômes...",
@@ -368,9 +368,15 @@
       "back": "Retour",
       "continue": "Continuer",
       "parts": {
-        "Head": "Tête", "Neck": "Cou", "Chest": "Poitrine",
-        "Abdomen": "Abdomen", "Left Arm": "Bras gauche", "Right Arm": "Bras droit",
-        "Left Leg": "Jambe gauche", "Right Leg": "Jambe droite", "Back": "Dos"
+        "Head": "Tête",
+        "Neck": "Cou",
+        "Chest": "Poitrine",
+        "Abdomen": "Abdomen",
+        "Left Arm": "Bras gauche",
+        "Right Arm": "Bras droit",
+        "Left Leg": "Jambe gauche",
+        "Right Leg": "Jambe droite",
+        "Back": "Dos"
       }
     },
     "step3": {
@@ -392,14 +398,14 @@
       "summarySeverity": "Gravité",
       "summaryDuration": "Durée",
       "back": "Retour",
-      "getAssessment": "Obtenir l'évaluation IA"
+      "getAssessment": "Analyser mes symptômes"
     },
     "loading": {
       "title": "Analyse de vos symptômes",
       "desc": "Notre IA traite vos informations..."
     },
     "result": {
-      "title": "Résultat de l'évaluation IA",
+      "title": "Résultat du dépistage",
       "subtitle": "Dépistage préliminaire — pas un diagnostic médical",
       "differential": "Conditions possibles (Différentiel IA)",
       "lowConfidenceNote": "Service IA hors ligne — évaluation de base affichée",
@@ -413,7 +419,9 @@
       "bookAppointment": "Prendre rendez-vous",
       "scheduleDoctor": "Prendre rendez-vous avec un médecin",
       "toastCompleted": "Évaluation IA terminée",
-      "toastUnavailable": "Service IA temporairement indisponible — évaluation de base affichée"
+      "toastUnavailable": "Service IA temporairement indisponible — évaluation de base affichée",
+      "screeningNote": "La confiance reflète la correspondance de vos symptômes avec des schémas connus — pas une certitude diagnostique.",
+      "confidence": "correspondance"
     },
     "previous": {
       "title": "Évaluations précédentes",
@@ -427,11 +435,20 @@
       "selfCare": "Conseils d'automédication",
       "reportedSymptoms": "Symptômes signalés",
       "possibleCondition": "Condition possible",
-      "download": "Télécharger ce rapport"
+      "download": "Télécharger ce rapport",
+      "feedbackTitle": "Un médecin a-t-il confirmé ce dépistage ?",
+      "feedbackYes": "Oui, confirmé",
+      "feedbackNo": "Non, diagnostic différent",
+      "feedbackNotYet": "Je n'ai pas encore vu de médecin",
+      "feedbackDoctorLabel": "Qu'a dit le médecin ?",
+      "feedbackDoctorPlaceholder": "ex. Malaria, Typhoïde...",
+      "feedbackSubmit": "Envoyer le retour",
+      "feedbackThanks": "Merci — votre avis aide à améliorer l'IA",
+      "feedbackHelps": "Votre réponse aide à rendre l'IA plus précise pour tous"
     },
     "disclaimer": {
       "title": "Avertissement important",
-      "text": "Cette évaluation IA est uniquement à titre informatif et ne remplace pas un avis médical professionnel. Consultez toujours un professionnel de santé qualifié pour un diagnostic et un traitement appropriés."
+      "text": "Cet outil effectue uniquement un dépistage des symptômes — il ne peut remplacer un examen clinique, des analyses de laboratoire ou le diagnostic d'un médecin qualifié. Consultez toujours un professionnel de santé agréé avant de prendre des décisions médicales."
     },
     "severity": {
       "low": "Faible",
@@ -560,7 +577,7 @@
     "earnings": "Revenus",
     "totalEarnings": "Revenus totaux de tous les temps",
     "todayAppointments": "Rendez-vous d'aujourd'hui",
-    "completedAppointments": "Rendez-vous terminés",
+    "completedAppointments": "rendez-vous terminés",
     "availability": "Calendrier de disponibilité",
     "setAvailability": "Définir la disponibilité",
     "weeklySchedule": "Planning hebdomadaire",
@@ -582,7 +599,6 @@
     "noSlotsOnDate": "Aucun créneau à cette date",
     "unblock": "Débloquer",
     "block": "Bloquer",
-    "completedAppointments": "rendez-vous terminés",
     "prescriptionTemplates": "Modèles d'ordonnances rapides",
     "viewDetails": "Voir les détails"
   },
