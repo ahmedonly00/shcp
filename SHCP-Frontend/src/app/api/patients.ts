@@ -40,7 +40,7 @@ export const patientsApi = {
   /** Returns a URL with the auth token baked in as a query param for inline display */
   ehrFileUrl: (storedName: string) => {
     const token = localStorage.getItem('accessToken') ?? '';
-    return `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'}/api/patients/me/ehr/files/${storedName}?token=${token}`;
+    return `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8082'}/api/patients/me/ehr/files/${storedName}?token=${token}`;
   },
 
   updateVitals: (vitals: Record<string, string>) =>
@@ -76,7 +76,7 @@ export const patientsApi = {
 
   avatarUrl: (storedName: string) => {
     const token = localStorage.getItem('accessToken') ?? '';
-    return `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'}/api/users/me/files/${storedName}?token=${token}`;
+    return `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8082'}/api/users/me/files/${storedName}?token=${token}`;
   },
 
   getMySymptomReports: (page = 0, size = 10) =>

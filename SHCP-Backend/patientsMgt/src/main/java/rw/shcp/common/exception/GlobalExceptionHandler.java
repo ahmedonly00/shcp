@@ -12,6 +12,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import rw.shcp.common.response.ApiResponse;
 
 import java.util.Map;
@@ -65,6 +66,17 @@ public class GlobalExceptionHandler {
                 log.warn("Unreadable request body on {}: {}", req.getRequestURI(), ex.getMessage());
                 return ResponseEntity.badRequest()
                                 .body(ApiResponse.fail("BAD_REQUEST", "Malformed or unreadable request body"));
+        }
+
+        @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+        public ResponseEntity<ApiResponse<?>> handleTypeMismatch(MethodArgumentTypeMismatchException ex,
+                        HttpServletRequest req) {
+                log.warn("Type mismatch on {}: param='{}' value='{}'",
+                                req.getRequestURI(), ex.getName(), ex.getValue());
+                return ResponseEntity.badRequest()
+                                .body(ApiResponse.fail("BAD_REQUEST",
+                                                "Invalid value '" + ex.getValue()
+                                                + "' for path parameter '" + ex.getName() + "'"));
         }
 
         @ExceptionHandler(DataIntegrityViolationException.class)

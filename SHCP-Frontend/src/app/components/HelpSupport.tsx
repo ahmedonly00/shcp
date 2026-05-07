@@ -53,7 +53,7 @@ export const HelpSupport: React.FC = () => {
 
   // Check system health via actuator
   useEffect(() => {
-    apiClient.get('/actuator/health', { baseURL: 'http://localhost:8080' })
+    apiClient.get('/actuator/health', { baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8082' })
       .then((res: { data: unknown }) => {
         const data = res.data as { status?: string };
         setSystemStatus(data?.status === 'UP' ? 'operational' : 'degraded');

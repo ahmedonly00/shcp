@@ -606,7 +606,7 @@ export const ForgotPasswordForm: React.FC<ForgotPasswordProps> = ({ onBack }) =>
 
 type AuthView = 'login' | 'register' | 'forgot' | 'verify-otp';
 
-export const EnhancedAuthPage: React.FC<{ onAuthSuccess: () => void }> = ({ onAuthSuccess }) => {
+export const EnhancedAuthPage: React.FC<{ onAuthSuccess: () => void; onBack: () => void }> = ({ onAuthSuccess, onBack }) => {
   const { pendingEmail } = useAuth();
   const { t } = useTranslation();
   const [view, setView] = useState<AuthView>('login');
@@ -649,6 +649,13 @@ export const EnhancedAuthPage: React.FC<{ onAuthSuccess: () => void }> = ({ onAu
           <div className="absolute bottom-0 right-0 w-96 h-96 bg-white rounded-full translate-x-32 translate-y-32" />
         </div>
         <div className="relative z-10">
+          <button
+            onClick={onBack}
+            className="flex items-center gap-1.5 text-white/70 hover:text-white text-sm font-medium mb-8 transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+            Back to Home
+          </button>
           <div className="flex items-center gap-3 mb-6">
             <svg width="40" height="40" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
               <rect width="36" height="36" rx="9" fill="white" fillOpacity="0.2" />
@@ -688,6 +695,15 @@ export const EnhancedAuthPage: React.FC<{ onAuthSuccess: () => void }> = ({ onAu
       <div className="flex-1 h-full overflow-y-auto bg-card">
         <div className="min-h-full flex items-center justify-center p-4 lg:p-8">
         <div className="w-full max-w-md py-4">
+          <div className="lg:hidden mb-4">
+            <button
+              onClick={onBack}
+              className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground text-sm font-medium transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+              Back to Home
+            </button>
+          </div>
           <div className="lg:hidden text-center mb-6">
             <div className="flex justify-center mb-3">
               <svg width="40" height="40" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">

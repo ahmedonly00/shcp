@@ -216,6 +216,7 @@ const MainApp: React.FC = () => {
     return (
       <EnhancedAuthPage
         onAuthSuccess={() => setShowAuth(false)}
+        onBack={() => setShowAuth(false)}
       />
     );
   }

@@ -747,6 +747,10 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
     try {
       updatePhase('connecting');
       const consultation = await consultationsApi.startInstant({ providerId });
+      if (!consultation?.consultationId) {
+        console.error('[startInstantConsult] Backend returned consultation without consultationId:', consultation);
+        throw new Error('Server created the consultation but returned no ID — please try again');
+      }
       consultationRef.current = consultation;
       iceConfigRef.current = await fetchIceServers(consultation.consultationId);
       await getUserMedia();
@@ -763,6 +767,10 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
   const joinInstantConsult = async (consultation: ApiConsultationDto) => {
     updatePhase('connecting');
     try {
+      if (!consultation?.consultationId) {
+        console.error('[joinInstantConsult] Consultation missing consultationId:', consultation);
+        throw new Error('Consultation data is incomplete — please refresh and try again');
+      }
       consultationRef.current = consultation;
       if (isProvider) {
         const savedNotes = localStorage.getItem(`shcp_notes_${consultation.consultationId}`);

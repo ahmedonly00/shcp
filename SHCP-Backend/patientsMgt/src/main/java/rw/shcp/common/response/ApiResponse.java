@@ -4,11 +4,10 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 
 import java.time.Instant;
 
-@JsonInclude(JsonInclude.Include.NON_NULL)
 public record ApiResponse<T>(
         boolean success,
         T data,
-        ErrorBody error,
+        @JsonInclude(JsonInclude.Include.NON_NULL) ErrorBody error,
         String timestamp
 ) {
     public static <T> ApiResponse<T> ok(T data) {
@@ -23,5 +22,6 @@ public record ApiResponse<T>(
         return new ApiResponse<>(false, null, new ErrorBody(code, message, details), Instant.now().toString());
     }
 
-    public record ErrorBody(String code, String message, Object details) {}
+    public record ErrorBody(String code, String message,
+                            @JsonInclude(JsonInclude.Include.NON_NULL) Object details) {}
 }
