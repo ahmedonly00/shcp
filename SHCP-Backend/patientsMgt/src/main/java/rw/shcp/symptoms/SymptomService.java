@@ -15,6 +15,7 @@ import rw.shcp.common.exception.AppException;
 import rw.shcp.ehr.HealthRecord;
 import rw.shcp.ehr.HealthRecordRepository;
 import rw.shcp.symptoms.dto.AIAnalysisResponse;
+import rw.shcp.symptoms.dto.FeedbackInput;
 import rw.shcp.symptoms.dto.SymptomInput;
 import rw.shcp.symptoms.dto.SymptomReportDto;
 import rw.shcp.users.model.Patient;
@@ -37,6 +38,7 @@ import java.util.UUID;
 public class SymptomService {
 
     private final SymptomReportRepository symptomReportRepository;
+    private final SymptomFeedbackRepository feedbackRepository;
     private final PatientRepository patientRepository;
     private final HealthRecordRepository ehrRepository;
     private final ObjectMapper objectMapper;
@@ -112,6 +114,27 @@ public class SymptomService {
         }
 
         return SymptomReportDto.from(report, ai);
+    }
+
+    // ── Feedback ──────────────────────────────────────────────
+
+    @Transactional
+    @PreAuthorize("hasRole('PATIENT')")
+    public void submitFeedback(UUID reportId, UUID patientUserId, FeedbackInput input) {
+        SymptomReport report = symptomReportRepository
+                .findByReportIdAndPatientUserId(reportId, patientUserId)
+                .orElseThrow(() -> AppException.notFound("Symptom report not found"));
+
+        // Upsert: update existing feedback or create a new one
+        SymptomFeedback feedback = feedbackRepository.findByReport(report)
+                .orElse(new SymptomFeedback());
+        feedback.setReport(report);
+        feedback.setWasCorrect(input.wasCorrect());
+        feedback.setDoctorDiagnosis(input.doctorDiagnosis());
+        feedbackRepository.save(feedback);
+
+        log.info("Feedback saved for report {} — correct={}, doctorDx={}",
+                reportId, input.wasCorrect(), input.doctorDiagnosis());
     }
 
     // ── AI service call (with graceful degradation) ───────────

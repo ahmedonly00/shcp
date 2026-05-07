@@ -10,6 +10,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import rw.shcp.common.response.ApiResponse;
 import rw.shcp.common.util.SecurityUtils;
+import rw.shcp.symptoms.dto.FeedbackInput;
 import rw.shcp.symptoms.dto.SymptomInput;
 import rw.shcp.symptoms.dto.SymptomReportDto;
 
@@ -46,5 +47,20 @@ public class SymptomController {
         UUID patientId = SecurityUtils.currentUserId();
         return ResponseEntity.ok(ApiResponse.ok(
                 symptomService.getReport(reportId, patientId)));
+    }
+
+    @PostMapping("/reports/{reportId}/feedback")
+    @PreAuthorize("hasRole('PATIENT')")
+    @Operation(
+        summary = "Submit feedback on a screening result",
+        description = "Records whether the AI screening matched the doctor's diagnosis. " +
+                      "Submitting again overwrites the previous feedback for the same report."
+    )
+    public ResponseEntity<ApiResponse<Void>> submitFeedback(
+            @PathVariable UUID reportId,
+            @Valid @RequestBody FeedbackInput input) {
+        UUID patientId = SecurityUtils.currentUserId();
+        symptomService.submitFeedback(reportId, patientId, input);
+        return ResponseEntity.ok(ApiResponse.ok(null));
     }
 }
