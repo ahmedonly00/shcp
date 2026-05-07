@@ -73,7 +73,7 @@ jobs:
       - name: Build Docker image
         run: |
           docker build \
-            --build-arg VITE_API_BASE_URL=http://localhost:8080 \
+            --build-arg VITE_API_BASE_URL=http://localhost:8082 \
             --build-arg VITE_SIGNALING_URL=http://localhost:3001 \
             -t shcp-frontend:ci \
             ./SHCP-Frontend

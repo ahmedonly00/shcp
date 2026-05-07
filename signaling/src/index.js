@@ -10,7 +10,7 @@ const { registerHandlers } = require("./handlers");
 
 const PORT          = parseInt(process.env.PORT || "3001", 10);
 const FRONTEND_URL  = process.env.FRONTEND_URL || "http://localhost:3000";
-const API_ORIGIN    = process.env.API_ORIGIN    || "http://localhost:8080";
+const API_ORIGIN    = process.env.API_ORIGIN    || "http://localhost:8082";
 
 // ── HTTP app ──────────────────────────────────────────────────────────────────
 const app = express();

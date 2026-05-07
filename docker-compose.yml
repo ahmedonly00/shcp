@@ -18,7 +18,7 @@ services:
       context: ./SHCP-Frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080}
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8082}
         VITE_SIGNALING_URL: ${VITE_SIGNALING_URL:-http://localhost:3001}
         VITE_GOOGLE_FIT_CLIENT_ID: ${VITE_GOOGLE_FIT_CLIENT_ID:-}
     container_name: shcp-frontend
@@ -40,7 +40,7 @@ services:
       dockerfile: Dockerfile
     container_name: shcp-api
     ports:
-      - "8080:8080"
+      - "8082:8082"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/shcp_db
       DB_USERNAME: postgres
@@ -73,7 +73,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8082/actuator/health"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -118,7 +118,7 @@ services:
       PORT: 3001
       JWT_SECRET: ${JWT_SECRET}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
-      API_ORIGIN: http://api:8080
+      API_ORIGIN: http://api:8082
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD}
