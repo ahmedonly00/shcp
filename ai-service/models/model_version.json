@@ -1,0 +1,56 @@
+{
+  "version": "RandomForest-v3-calibrated",
+  "trained_at": "2026-05-06T15:47:57.271637Z",
+  "algorithm": "RandomForestClassifier + Platt scaling",
+  "calibration": "sigmoid (cv=prefit)",
+  "n_estimators": 300,
+  "n_diseases": 41,
+  "n_symptoms": 132,
+  "training_samples": 120996,
+  "test_accuracy": 0.978977,
+  "cv_mean": 0.987306,
+  "avg_confidence_raw": 74.48,
+  "avg_confidence": 96.98,
+  "top10_features": [
+    {
+      "feature": "vomiting",
+      "importance": 0.01846
+    },
+    {
+      "feature": "muscle_pain",
+      "importance": 0.018339
+    },
+    {
+      "feature": "itching",
+      "importance": 0.018251
+    },
+    {
+      "feature": "high_fever",
+      "importance": 0.017954
+    },
+    {
+      "feature": "fatigue",
+      "importance": 0.017315
+    },
+    {
+      "feature": "headache",
+      "importance": 0.017076
+    },
+    {
+      "feature": "chest_pain",
+      "importance": 0.016561
+    },
+    {
+      "feature": "nausea",
+      "importance": 0.016489
+    },
+    {
+      "feature": "skin_rash",
+      "importance": 0.016479
+    },
+    {
+      "feature": "loss_of_appetite",
+      "importance": 0.016068
+    }
+  ]
+}

@@ -66,7 +66,17 @@ def _load_models() -> None:
 
     if _SHAP_AVAILABLE:
         try:
-            _explainer = _shap.TreeExplainer(_clf)
+            # SHAP TreeExplainer needs a raw RandomForest, not a CalibratedClassifierCV wrapper.
+            # train_model.py saves the unwrapped base RF as disease_classifier_base.pkl.
+            _base_path = os.path.join(_MODELS_DIR, "disease_classifier_base.pkl")
+            if os.path.exists(_base_path):
+                with open(_base_path, "rb") as f:
+                    _shap_clf = pickle.load(f)
+            elif hasattr(_clf, "calibrated_classifiers_"):
+                _shap_clf = _clf.calibrated_classifiers_[0].estimator
+            else:
+                _shap_clf = _clf
+            _explainer = _shap.TreeExplainer(_shap_clf)
         except Exception as exc:
             logger.warning("SHAP explainer init failed: %s", exc)
 
