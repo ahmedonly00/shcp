@@ -90,7 +90,9 @@ public class AuthController {
 
     // ── Helpers ───────────────────────────────────────────────
 
-    /** Extracts the real client IP, respecting X-Forwarded-For from reverse proxies. */
+    /**
+     * Extracts the real client IP, respecting X-Forwarded-For from reverse proxies.
+     */
     private String resolveClientIp(HttpServletRequest request) {
         String xff = request.getHeader("X-Forwarded-For");
         if (xff != null && !xff.isEmpty()) {

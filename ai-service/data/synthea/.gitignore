@@ -1,0 +1,5 @@
+# Synthea binary — too large for git (190+ MB); re-download with synthea_setup.py
+*.jar
+
+# Generated patient output — regenerate with synthea_setup.py + synthea_converter.py
+output/
