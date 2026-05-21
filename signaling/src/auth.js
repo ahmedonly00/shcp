@@ -16,7 +16,7 @@ const SECRET = Buffer.from(process.env.JWT_SECRET, "base64");
  * Returns { userId, role } on success, throws on failure.
  */
 function verifyToken(token) {
-  const payload = jwt.verify(token, SECRET, { algorithms: ["HS256"] });
+  const payload = jwt.verify(token, SECRET, { algorithms: ["HS384"] });
 
   if (!payload.userId || !payload.role) {
     throw new Error("Token missing required claims");

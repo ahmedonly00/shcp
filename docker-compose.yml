@@ -94,12 +94,13 @@ services:
     # calls it over the internal shcp-net network.
     environment:
       FLASK_ENV: production
+      GUNICORN_WORKERS: "2"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
       interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 120s
     networks:
       - shcp-net
     restart: unless-stopped

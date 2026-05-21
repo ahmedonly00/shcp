@@ -1,19 +1,24 @@
 """Gunicorn configuration for the SHCP AI microservice."""
-import multiprocessing
 import os
 
 # ── Binding ───────────────────────────────────────────────────────────────────
 bind = f"0.0.0.0:{os.getenv('PORT', '5000')}"
 
 # ── Workers ───────────────────────────────────────────────────────────────────
-# Each worker loads the TF model once; keep workers low to control memory.
-workers = int(os.getenv("GUNICORN_WORKERS", max(2, multiprocessing.cpu_count())))
+workers = int(os.getenv("GUNICORN_WORKERS", "2"))
 worker_class = "sync"
-threads = 1                 # TF is not thread-safe per worker
+threads = 1
+
+# ── Preload ───────────────────────────────────────────────────────────────────
+# Load the Flask app (and all pickle models) once in the master process before
+# forking workers. Workers inherit loaded objects via OS copy-on-write, so
+# models are loaded exactly once regardless of worker count.
+preload_app = True
 
 # ── Timeouts ─────────────────────────────────────────────────────────────────
-timeout = 30                # worker killed if silent for 30 s
-graceful_timeout = 10       # worker gets 10 s to finish in-flight request on SIGTERM
+# pickle model loading at startup takes ~60 s; 120 s gives comfortable headroom.
+timeout = 120
+graceful_timeout = 30
 keepalive = 5
 
 # ── Logging ───────────────────────────────────────────────────────────────────
