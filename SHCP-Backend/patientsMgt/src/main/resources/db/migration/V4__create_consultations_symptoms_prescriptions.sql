@@ -20,19 +20,20 @@ CREATE TABLE consultations (
 
 -- ── AI Symptom Reports ────────────────────────────────────────
 CREATE TABLE symptom_reports (
-    report_id      UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    patient_id     UUID        NOT NULL
-                   REFERENCES patients(user_id) ON DELETE CASCADE,
-    symptoms       JSONB       NOT NULL DEFAULT '[]'::jsonb,
-    body_map_data  JSONB,
-    symptom_text   TEXT,
-    language       VARCHAR(5)  NOT NULL DEFAULT 'rw',
-    ai_urgency     VARCHAR(20) CHECK (ai_urgency IN ('EMERGENCY', 'URGENT',
-                                                      'ROUTINE', 'SELF_CARE', 'UNKNOWN')),
-    ai_pathway     VARCHAR(50),
-    ai_confidence  DECIMAL(5,2) CHECK (ai_confidence >= 0 AND ai_confidence <= 100),
-    ai_raw_response JSONB,      -- full Flask response stored for audit
-    created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+    report_id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    patient_id         UUID        NOT NULL
+                       REFERENCES patients(user_id) ON DELETE CASCADE,
+    symptoms           JSONB       NOT NULL DEFAULT '[]'::jsonb,
+    body_map_data      JSONB,
+    symptom_text       TEXT,
+    language           VARCHAR(5)  NOT NULL DEFAULT 'rw',
+    ai_urgency         VARCHAR(20) CHECK (ai_urgency IN ('EMERGENCY', 'URGENT',
+                                                          'ROUTINE', 'SELF_CARE', 'UNKNOWN')),
+    ai_pathway         VARCHAR(50),
+    ai_confidence      DECIMAL(5,2) CHECK (ai_confidence >= 0 AND ai_confidence <= 100),
+    care_recommendation TEXT,
+    ai_raw_response    JSONB,      -- full Flask response stored for audit
+    created_at         TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 -- ── Digital Prescriptions ─────────────────────────────────────

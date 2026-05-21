@@ -22,6 +22,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -210,9 +211,9 @@ public class ProviderService {
     @PreAuthorize("hasRole('PROVIDER')")
     public HealthRecordDto getPatientEhr(UUID providerId, UUID patientId) {
         findProviderOrThrow(providerId);
-        HealthRecord ehr = ehrRepository.findByPatientUserId(patientId)
-                .orElseThrow(() -> AppException.notFound("Health record not found for this patient"));
-        return HealthRecordDto.from(ehr);
+        return ehrRepository.findByPatientUserId(patientId)
+                .map(HealthRecordDto::from)
+                .orElse(HealthRecordDto.empty(patientId));
     }
 
     // ── Instant availability ──────────────────────────────────

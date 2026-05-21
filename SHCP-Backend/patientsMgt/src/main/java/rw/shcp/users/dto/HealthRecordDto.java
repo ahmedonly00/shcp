@@ -37,4 +37,9 @@ public record HealthRecordDto(
                 r.getUpdatedAt()
         );
     }
+
+    public static HealthRecordDto empty(UUID patientId) {
+        return new HealthRecordDto(null, patientId,
+                "[]", "[]", "[]", null, null, null, null, "[]", "[]", null, null);
+    }
 }

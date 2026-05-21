@@ -105,7 +105,8 @@ public class ConsultationService {
                 AuditEventTypes.CALL_STARTED, providerUserId, "PROVIDER", null, null);
 
         publishConsultationEvent(saved, "consultation.started",
-                "Your consultation has started. Join room: " + saved.getRoomId());
+                "Your consultation has started.",
+                "Consultation started — room: " + saved.getRoomId());
 
         return ConsultationDto.from(saved);
     }
@@ -235,8 +236,12 @@ public class ConsultationService {
                 AuditEventTypes.CALL_ENDED, providerUserId, "PROVIDER",
                 null, "{\"durationMinutes\":" + minutes + "}");
 
+        String providerName = consultation.getAppointment().getProvider().getUser().getName();
         publishConsultationEvent(saved, "consultation.completed",
-                "Your consultation has ended. Duration: " + minutes + " minutes.");
+                "Thank you for your consultation with Dr. " + providerName
+                        + ". Duration: " + minutes + " min. "
+                        + "Check your prescriptions tab for any medication issued.",
+                "Consultation completed. Duration: " + minutes + " min.");
 
         return ConsultationDto.from(saved);
     }
@@ -446,22 +451,25 @@ public class ConsultationService {
         auditRepository.save(event);
     }
 
-    private void publishConsultationEvent(Consultation c, String eventType, String message) {
+    private void publishConsultationEvent(Consultation c, String eventType,
+                                          String patientMessage, String providerMessage) {
         UUID patientId  = c.getAppointment().getPatient().getUserId();
         UUID providerId = c.getAppointment().getProvider().getUserId();
+        String providerName = c.getAppointment().getProvider().getUser().getName();
 
         Map<String, Object> meta = Map.of(
                 "consultationId", c.getConsultationId().toString(),
                 "roomId",         c.getRoomId() != null ? c.getRoomId() : "",
-                "appointmentId",  c.getAppointment().getAppointmentId().toString()
+                "appointmentId",  c.getAppointment().getAppointmentId().toString(),
+                "providerName",   providerName
         );
 
         notificationPublisher.publish(
-                NotificationEvent.email(patientId,  eventType, message, meta));
+                NotificationEvent.email(patientId,  eventType, patientMessage, meta));
         notificationPublisher.publish(
-                NotificationEvent.push(patientId,   eventType, message, meta));
+                NotificationEvent.push(patientId,   eventType, patientMessage, meta));
         notificationPublisher.publish(
-                NotificationEvent.push(providerId,  eventType, message, meta));
+                NotificationEvent.push(providerId,  eventType, providerMessage, meta));
     }
 
     private static String computeHmacSha1(String secret, String data) {

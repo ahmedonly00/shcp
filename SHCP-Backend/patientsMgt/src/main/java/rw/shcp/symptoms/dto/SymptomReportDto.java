@@ -29,9 +29,13 @@ public record SymptomReportDto(
         Integer                     followUpDays,
         /** Top-3 differential predictions [{disease, probability}] from the AI model. */
         List<Map<String, Object>>   top3Predictions,
+        /** SHAP-based symptom contributions [{symptom, contribution, direction, present}]. */
+        List<Map<String, Object>>   explainingFactors,
         String                      disclaimer,
         /** Non-null when Flask returned NO_SYMPTOMS_DETECTED or LOW_CONFIDENCE. */
         String                      message,
+        /** True when Flask inferred symptom duration from free text rather than the request field. */
+        boolean                     durationInferred,
         boolean                     isDegraded,
         OffsetDateTime              createdAt
 ) {
@@ -53,8 +57,10 @@ public record SymptomReportDto(
                 ai.getSelfCareTips() != null ? ai.getSelfCareTips() : List.of(),
                 ai.getFollowUpDays(),
                 ai.getTop3Predictions() != null ? ai.getTop3Predictions() : List.of(),
+                ai.getExplainingFactors() != null ? ai.getExplainingFactors() : List.of(),
                 ai.getDisclaimer(),
                 ai.getMessage(),
+                ai.isDurationInferred(),
                 ai.isDegraded(),
                 report.getCreatedAt()
         );

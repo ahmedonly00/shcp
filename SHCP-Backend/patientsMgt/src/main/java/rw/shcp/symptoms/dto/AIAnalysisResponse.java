@@ -42,6 +42,14 @@ public class AIAnalysisResponse {
     @JsonProperty("top_3_predictions")
     private List<Map<String, Object>> top3Predictions;
 
+    /**
+     * SHAP-based symptom contributions driving the prediction.
+     * Each entry: {symptom, contribution, direction, present}.
+     * Empty list for LOW_CONFIDENCE responses.
+     */
+    @JsonProperty("explaining_factors")
+    private List<Map<String, Object>> explainingFactors;
+
     /** Raw list of detected symptom column names */
     private List<String> detectedSymptoms;
 
@@ -62,6 +70,15 @@ public class AIAnalysisResponse {
     private String disclaimer;
 
     private String processedAt;
+
+    /** Version string of the model that produced this result, e.g. "RandomForest-v3-calibrated". */
+    private String modelVersion;
+
+    /**
+     * True when Flask inferred the symptom duration from free text rather than
+     * the explicit duration field in the request.
+     */
+    private boolean durationInferred = false;
 
     /**
      * Explanatory message returned by Flask for NO_SYMPTOMS_DETECTED and LOW_CONFIDENCE.

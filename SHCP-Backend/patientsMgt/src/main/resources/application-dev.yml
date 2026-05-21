@@ -1,0 +1,20 @@
+# ── Development profile overrides ────────────────────────────────────────────
+# Activate with: --spring.profiles.active=dev  (or SPRING_PROFILES_ACTIVE=dev)
+#
+# V4 was updated to include care_recommendation in the CREATE TABLE (it was
+# previously added via ALTER TABLE in V19).  If your local database was created
+# before this change, Flyway will report a checksum mismatch for V4.
+# Run once to repair:
+#   mvn flyway:repair -Dflyway.url=... -Dflyway.user=... -Dflyway.password=...
+# or with the Flyway CLI:
+#   flyway repair
+#
+# validate-on-migrate is disabled here so the dev server starts cleanly while
+# the repair is pending.  Production keeps validate-on-migrate: true.
+
+spring:
+  flyway:
+    validate-on-migrate: false
+
+  jpa:
+    show-sql: true

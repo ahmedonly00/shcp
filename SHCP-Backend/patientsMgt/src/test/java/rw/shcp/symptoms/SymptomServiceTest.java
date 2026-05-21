@@ -1,6 +1,7 @@
 package rw.shcp.symptoms;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -16,6 +17,7 @@ import rw.shcp.ehr.HealthRecordRepository;
 import rw.shcp.symptoms.dto.AIAnalysisResponse;
 import rw.shcp.symptoms.dto.SymptomInput;
 import rw.shcp.symptoms.dto.SymptomReportDto;
+import rw.shcp.symptoms.SymptomFeedbackRepository;
 import rw.shcp.users.model.Patient;
 import rw.shcp.users.repository.PatientRepository;
 import rw.shcp.users.model.User;
@@ -34,11 +36,15 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class SymptomServiceTest {
 
-    @Mock SymptomReportRepository symptomReportRepository;
-    @Mock PatientRepository        patientRepository;
-    @Mock HealthRecordRepository   ehrRepository;
-    @Mock RestTemplate             aiRestTemplate;
-    @Spy  ObjectMapper             objectMapper = new ObjectMapper().findAndRegisterModules();
+    @Mock SymptomReportRepository   symptomReportRepository;
+    @Mock SymptomFeedbackRepository feedbackRepository;
+    @Mock PatientRepository          patientRepository;
+    @Mock HealthRecordRepository     ehrRepository;
+    @Spy  ObjectMapper               objectMapper   = new ObjectMapper().findAndRegisterModules();
+    @Spy  ObjectMapper               aiObjectMapper = new ObjectMapper()
+            .setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
+            .findAndRegisterModules();
+    @Mock RestTemplate               aiRestTemplate;
 
     @InjectMocks SymptomService symptomService;
 
@@ -154,15 +160,16 @@ class SymptomServiceTest {
         report.setLanguage("en");
         try {
             report.setAiRawResponse(new ObjectMapper()
+                    .setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
                     .findAndRegisterModules().writeValueAsString(ai));
         } catch (Exception e) { throw new RuntimeException(e); }
 
         when(symptomReportRepository.findByReportIdAndPatientUserId(reportId, patientId))
                 .thenReturn(Optional.of(report));
-        // Spy delegation can fail for readValue due to @ConstructorProperties on AIAnalysisResponse;
-        // stub explicitly to guarantee the correct object is returned.
+        // parseStoredAiResponse now uses aiObjectMapper (snake_case); stub it to guarantee
+        // the correct object is returned regardless of field-name mapping edge cases.
         try {
-            doReturn(ai).when(objectMapper).readValue(anyString(), eq(AIAnalysisResponse.class));
+            doReturn(ai).when(aiObjectMapper).readValue(anyString(), eq(AIAnalysisResponse.class));
         } catch (Exception ignored) {}
 
         SymptomReportDto dto = symptomService.getReport(reportId, patientId);

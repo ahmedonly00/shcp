@@ -15,8 +15,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
+import rw.shcp.appointments.AppointmentRepository;
+import rw.shcp.common.exception.AppException;
 import rw.shcp.common.response.ApiResponse;
 import rw.shcp.common.util.SecurityUtils;
+import rw.shcp.symptoms.SymptomService;
+import rw.shcp.symptoms.dto.SymptomReportDto;
 import rw.shcp.users.dto.*;
 import rw.shcp.users.service.ProviderService;
 
@@ -30,7 +34,9 @@ import java.util.UUID;
 @Tag(name = "Providers", description = "Provider profiles, availability and appointment management")
 public class ProviderController {
 
-    private final ProviderService providerService;
+    private final ProviderService       providerService;
+    private final SymptomService        symptomService;
+    private final AppointmentRepository appointmentRepository;
 
     // ── Public endpoints ──────────────────────────────────────
 
@@ -126,6 +132,19 @@ public class ProviderController {
             @PathVariable UUID patientId) {
         UUID userId = SecurityUtils.currentUserId();
         return ResponseEntity.ok(ApiResponse.ok(providerService.getPatientEhr(userId, patientId)));
+    }
+
+    @GetMapping("/me/patients/{patientId}/symptom-reports/latest")
+    @PreAuthorize("hasRole('PROVIDER')")
+    @Operation(summary = "Get a patient's most recent symptom report (providers only)")
+    public ResponseEntity<ApiResponse<SymptomReportDto>> getPatientLatestSymptomReport(
+            @PathVariable UUID patientId) {
+        UUID userId = SecurityUtils.currentUserId();
+        if (!appointmentRepository.existsByProviderUserIdAndPatientUserId(userId, patientId)) {
+            throw AppException.forbidden("You do not have an appointment with this patient");
+        }
+        return ResponseEntity.ok(ApiResponse.ok(
+                symptomService.getLatestReportForProvider(patientId).orElse(null)));
     }
 
     @GetMapping("/me/slots")

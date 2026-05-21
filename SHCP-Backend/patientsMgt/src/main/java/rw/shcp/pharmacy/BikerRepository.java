@@ -36,7 +36,7 @@ public interface BikerRepository extends JpaRepository<Biker, UUID> {
                 CASE WHEN LOWER(b.operating_zone) LIKE LOWER(CONCAT('%', :district, '%')) THEN 0
                      ELSE 1
                 END ASC,
-                b.created_at ASC
+                b.registered_at ASC
             """, nativeQuery = true)
     List<Biker> findAvailableSortedByZone(
             @Param("pharmacyId") UUID pharmacyId,

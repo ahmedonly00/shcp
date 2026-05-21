@@ -15,5 +15,8 @@ INSERT INTO moh_report_config (recipient_emails, schedule, metrics, enabled)
 VALUES ('[]', 'WEEKLY', '["consultations","appointments","registrations","symptoms","prescriptions","providers"]', FALSE)
 ON CONFLICT DO NOTHING;
 
--- Add care_recommendation to symptom_reports if not already added
+-- care_recommendation was added here originally before it was included in V4.
+-- The ALTER TABLE is kept with IF NOT EXISTS so this migration remains safe to
+-- run against databases that were initialised before V4 was updated.
+-- On fresh deployments the column already exists from V4 and this is a no-op.
 ALTER TABLE symptom_reports ADD COLUMN IF NOT EXISTS care_recommendation TEXT;

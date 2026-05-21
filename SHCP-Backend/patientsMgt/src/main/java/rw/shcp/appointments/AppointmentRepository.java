@@ -31,6 +31,9 @@ public interface AppointmentRepository extends JpaRepository<Appointment, UUID> 
          */
         boolean existsByProviderUserIdAndScheduledAt(UUID providerId, OffsetDateTime scheduledAt);
 
+        /** Access-control check: does this provider have any appointment with this patient? */
+        boolean existsByProviderUserIdAndPatientUserId(UUID providerId, UUID patientId);
+
         /**
          * Fetch confirmed appointments in a time window — used by the reminder
          * scheduler.

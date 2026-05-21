@@ -235,6 +235,7 @@ public class PrescriptionService {
                 .filter(p -> p.getStatus() != PrescriptionStatus.CANCELLED
                           && p.getStatus() != PrescriptionStatus.FAILED
                           && p.getStatus() != PrescriptionStatus.EXPIRED
+                          && p.getValidUntil() != null
                           && !p.getValidUntil().isBefore(LocalDate.now()))
                 .toList();
 

@@ -21,6 +21,9 @@ import rw.shcp.symptoms.dto.SymptomReportDto;
 import rw.shcp.users.model.Patient;
 import rw.shcp.users.repository.PatientRepository;
 
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.Period;
@@ -29,6 +32,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -42,6 +46,9 @@ public class SymptomService {
     private final PatientRepository patientRepository;
     private final HealthRecordRepository ehrRepository;
     private final ObjectMapper objectMapper;
+
+    @Qualifier("aiObjectMapper")
+    private final ObjectMapper aiObjectMapper;
 
     @Qualifier("aiRestTemplate")
     private final RestTemplate aiRestTemplate;
@@ -114,6 +121,18 @@ public class SymptomService {
         }
 
         return SymptomReportDto.from(report, ai);
+    }
+
+    // ── Provider access ───────────────────────────────────────
+
+    @PreAuthorize("hasRole('PROVIDER')")
+    public Optional<SymptomReportDto> getLatestReportForProvider(UUID patientId) {
+        return symptomReportRepository
+                .findByPatientUserId(patientId,
+                        PageRequest.of(0, 1, Sort.by(Sort.Direction.DESC, "createdAt")))
+                .stream()
+                .findFirst()
+                .map(r -> SymptomReportDto.from(r, parseStoredAiResponse(r)));
     }
 
     // ── Feedback ──────────────────────────────────────────────
@@ -213,7 +232,7 @@ public class SymptomService {
         report.setAiConfidence(
                 ai.getConfidence() != null ? BigDecimal.valueOf(ai.getConfidence()) : null);
         report.setCareRecommendation(ai.getCareRecommendation());
-        report.setAiRawResponse(toJson(ai));
+        report.setAiRawResponse(toJsonAi(ai));
         return report;
     }
 
@@ -286,7 +305,16 @@ public class SymptomService {
             return AIAnalysisResponse.degraded();
         }
         try {
-            return objectMapper.readValue(report.getAiRawResponse(), AIAnalysisResponse.class);
+            // Use snake_case mapper — matches how we now store ai_raw_response.
+            // For legacy records stored in camelCase, single-word fields (status, urgency,
+            // disease, pathway) still parse; multi-word fields will be null but non-critical
+            // for display.  Fall back to camelCase mapper only on total parse failure.
+            AIAnalysisResponse ai = aiObjectMapper.readValue(
+                    report.getAiRawResponse(), AIAnalysisResponse.class);
+            if (ai.getStatus() == null && ai.getUrgency() == null) {
+                return objectMapper.readValue(report.getAiRawResponse(), AIAnalysisResponse.class);
+            }
+            return ai;
         } catch (JsonProcessingException e) {
             log.warn("Could not parse stored AI response for report {}", report.getReportId());
             return AIAnalysisResponse.degraded();
@@ -298,6 +326,15 @@ public class SymptomService {
             return objectMapper.writeValueAsString(obj);
         } catch (JsonProcessingException e) {
             log.warn("JSON serialisation failed: {}", e.getMessage());
+            return "{}";
+        }
+    }
+
+    private String toJsonAi(Object obj) {
+        try {
+            return aiObjectMapper.writeValueAsString(obj);
+        } catch (JsonProcessingException e) {
+            log.warn("AI response serialisation failed: {}", e.getMessage());
             return "{}";
         }
     }

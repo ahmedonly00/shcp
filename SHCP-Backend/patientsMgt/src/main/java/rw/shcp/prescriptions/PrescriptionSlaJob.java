@@ -66,7 +66,14 @@ public class PrescriptionSlaJob {
         log.info("SLA check: found {} stale PENDING prescription(s) older than {} minutes",
                 stale.size(), pendingThresholdMinutes);
 
-        stale.forEach(this::escalate);
+        stale.forEach(p -> {
+            try {
+                escalate(p);
+            } catch (Exception e) {
+                log.error("SLA escalation failed for prescription={}: {}",
+                        p.getPrescriptionId(), e.getMessage(), e);
+            }
+        });
     }
 
     // ── Escalation logic ──────────────────────────────────────────────────────
