@@ -13,7 +13,7 @@ import {
   Calendar as CalendarIcon, Clock, Users, TrendingUp,
   Video, CheckCircle, XCircle, FileText,
   Plus, Edit, DollarSign, BarChart, User, Loader2, AlertTriangle, ArrowRight,
-  AlertCircle, ShieldCheck, Download
+  AlertCircle, ShieldCheck, Download, X, FilePlus
 } from 'lucide-react';
 import { useAuth } from '@/app/context/AuthContext';
 import { providersApi } from '@/app/api/providers';
@@ -186,6 +186,7 @@ export const DoctorPortal: React.FC<DoctorPortalProps> = ({ onNavigateToConsulta
     deliveryLongitude: '' as string,
   });
   const [selectedTemplate, setSelectedTemplate] = useState('');
+  const [newMed, setNewMed] = useState<MedicationItem>({ name: '', dosage: '', frequency: '', durationDays: 1 });
 
   // ── Load data ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -382,6 +383,21 @@ export const DoctorPortal: React.FC<DoctorPortalProps> = ({ onNavigateToConsulta
     }
   };
 
+  const handleOpenBlank = () => {
+    const defaultPatientId = patientOptions[0]?.id ?? '';
+    setSelectedTemplate('');
+    setRxForm({
+      patientId: defaultPatientId, medications: [], instructions: '', validForDays: 30,
+      deliveryAddress: '', deliveryDistrict: '', deliverySector: '', deliveryCell: '',
+      deliveryLatitude: '', deliveryLongitude: '',
+    });
+    setRxConflicts([]);
+    setRxSignature('');
+    setNewMed({ name: '', dosage: '', frequency: '', durationDays: 1 });
+    setShowRxDialog(true);
+    if (defaultPatientId) handleRxPatientSelect(defaultPatientId, []);
+  };
+
   const handleOpenTemplate = (template: string) => {
     const defaultPatientId = patientOptions[0]?.id ?? '';
     const medications = TEMPLATES[template] ?? [];
@@ -399,7 +415,7 @@ export const DoctorPortal: React.FC<DoctorPortalProps> = ({ onNavigateToConsulta
 
   const handleIssuePrescription = async () => {
     if (!rxForm.patientId) { toast.error('Please select a patient'); return; }
-    if (rxForm.medications.length === 0) { toast.error('No medications in template'); return; }
+    if (rxForm.medications.length === 0) { toast.error('Please add at least one medication'); return; }
     if (!rxSignature.trim()) { toast.error('Please sign the prescription before issuing'); return; }
     if (rxSignature.trim() !== (user?.name ?? '').trim()) {
       toast.error('Signature does not match your registered name'); return;
@@ -862,6 +878,9 @@ export const DoctorPortal: React.FC<DoctorPortalProps> = ({ onNavigateToConsulta
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Quick Prescription Templates</CardTitle>
+            <Button size="sm" onClick={handleOpenBlank} disabled={patientOptions.length === 0}>
+              <FilePlus className="h-4 w-4 mr-1" /> Issue Prescription
+            </Button>
           </div>
         </CardHeader>
         <CardContent>
@@ -1160,11 +1179,11 @@ export const DoctorPortal: React.FC<DoctorPortalProps> = ({ onNavigateToConsulta
 
       {/* ── Issue Prescription Dialog ──────────────────────────────────────── */}
       <Dialog open={showRxDialog} onOpenChange={setShowRxDialog}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl w-full">
           <DialogHeader>
-            <DialogTitle>Issue Prescription — {selectedTemplate}</DialogTitle>
+            <DialogTitle>{selectedTemplate ? `Issue Prescription — ${selectedTemplate}` : 'Issue Prescription'}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-4 overflow-y-auto max-h-[75vh] pr-1">
             <div className="space-y-2">
               <Label>Patient</Label>
               <Select
@@ -1200,26 +1219,80 @@ export const DoctorPortal: React.FC<DoctorPortalProps> = ({ onNavigateToConsulta
 
             <div className="space-y-2">
               <Label>Medications</Label>
-              <div className="border rounded-lg divide-y text-sm">
-                {rxForm.medications.map((med, i) => (
-                  <div key={i} className="p-3">
-                    <p className="font-medium">{med.name} — {med.dosage}</p>
-                    <p className="text-muted-foreground">{med.frequency} · {med.durationDays} days</p>
-                  </div>
-                ))}
+              {rxForm.medications.length > 0 && (
+                <div className="border rounded-lg divide-y text-sm">
+                  {rxForm.medications.map((med, i) => (
+                    <div key={i} className="p-3 flex items-start justify-between gap-2">
+                      <div>
+                        <p className="font-medium">{med.name} — {med.dosage}</p>
+                        <p className="text-muted-foreground">{med.frequency} · {med.durationDays} days</p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 shrink-0 text-muted-foreground hover:text-red-500"
+                        onClick={() => {
+                          const updated = rxForm.medications.filter((_, j) => j !== i);
+                          setRxForm(p => ({ ...p, medications: updated }));
+                          if (rxForm.patientId) handleRxPatientSelect(rxForm.patientId, updated);
+                        }}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="border rounded-lg p-3 space-y-2 bg-muted/30">
+                <p className="text-xs font-medium text-muted-foreground">Add Medication</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <Input
+                    placeholder="Medication name"
+                    value={newMed.name}
+                    onChange={e => setNewMed(p => ({ ...p, name: e.target.value }))}
+                  />
+                  <Input
+                    placeholder="Dosage (e.g. 500mg)"
+                    value={newMed.dosage}
+                    onChange={e => setNewMed(p => ({ ...p, dosage: e.target.value }))}
+                  />
+                  <Input
+                    placeholder="Frequency (e.g. Twice daily)"
+                    value={newMed.frequency}
+                    onChange={e => setNewMed(p => ({ ...p, frequency: e.target.value }))}
+                  />
+                  <Input
+                    type="number"
+                    min={1}
+                    placeholder="Duration (days)"
+                    value={newMed.durationDays || ''}
+                    onChange={e => setNewMed(p => ({ ...p, durationDays: Number(e.target.value) }))}
+                  />
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={!newMed.name.trim() || !newMed.dosage.trim() || !newMed.frequency.trim() || !newMed.durationDays}
+                  onClick={() => {
+                    const updated = [...rxForm.medications, { ...newMed }];
+                    setRxForm(p => ({ ...p, medications: updated }));
+                    setNewMed({ name: '', dosage: '', frequency: '', durationDays: 1 });
+                    if (rxForm.patientId) handleRxPatientSelect(rxForm.patientId, updated);
+                  }}
+                >
+                  <Plus className="h-3 w-3 mr-1" /> Add
+                </Button>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label>Valid for (days)</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  value={rxForm.validForDays}
-                  onChange={(e) => setRxForm(p => ({ ...p, validForDays: Number(e.target.value) }))}
-                />
-              </div>
+            <div className="w-full sm:w-1/2 space-y-2">
+              <Label>Valid for (days)</Label>
+              <Input
+                type="number"
+                min={1}
+                value={rxForm.validForDays}
+                onChange={(e) => setRxForm(p => ({ ...p, validForDays: Number(e.target.value) }))}
+              />
             </div>
 
             <div className="space-y-2">
@@ -1310,7 +1383,7 @@ export const DoctorPortal: React.FC<DoctorPortalProps> = ({ onNavigateToConsulta
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowRxDialog(false); setRxSignature(''); setRxConflicts([]); }}>Cancel</Button>
+            <Button variant="outline" onClick={() => { setShowRxDialog(false); setRxSignature(''); setRxConflicts([]); setNewMed({ name: '', dosage: '', frequency: '', durationDays: 1 }); }}>Cancel</Button>
             <Button
               onClick={handleIssuePrescription}
               disabled={issuingRx || !rxForm.patientId || rxSignature.trim() !== (user?.name ?? '').trim()}

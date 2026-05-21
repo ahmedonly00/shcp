@@ -104,7 +104,7 @@ export async function downloadPrescriptionPdf(rx: ApiPrescriptionDto): Promise<v
   doc.text(`Rx #${rxId}`, margin, 40);
 
   const issuedDate = rx.issuedAt.split('T')[0];
-  const validDate  = rx.validUntil;
+  const validDate  = rx.validUntil?.split('T')[0] ?? '';
   doc.text(`Issued: ${issuedDate}`, pw / 2, 40, { align: 'center' });
   doc.text(`Valid until: ${validDate}`, pw - margin, 40, { align: 'right' });
 

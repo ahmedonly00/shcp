@@ -144,11 +144,11 @@ export const MobileHealth: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    prescriptionsApi.getMine(0, 20)
+    prescriptionsApi.getMine()
       .then(prescriptions => {
         const reminders: MedReminder[] = [];
         for (const p of prescriptions ?? []) {
-          if (p.status !== 'ACTIVE') continue;
+          if (!['PENDING', 'PROCESSING', 'READY_FOR_DELIVERY'].includes(p.status)) continue;
           try {
             const meds: Medication[] = typeof p.medications === 'string'
               ? JSON.parse(p.medications) : p.medications;

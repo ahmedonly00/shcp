@@ -52,6 +52,7 @@ import { SymptomChecker } from "@/app/components/SymptomChecker";
 import { AppointmentScheduling } from "@/app/components/AppointmentScheduling";
 import { Teleconsultation } from "@/app/components/Teleconsultation";
 import { HealthRecords } from "@/app/components/HealthRecords";
+import { Prescriptions } from "@/app/components/Prescriptions";
 import { Notifications } from "@/app/components/Notifications";
 import { DoctorPortal } from "@/app/components/DoctorPortal";
 import { Appointment } from "@/app/types";
@@ -93,6 +94,7 @@ import {
   Bike,
   Building2,
   AlertCircle,
+  Pill,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -107,6 +109,7 @@ type View =
   | "appointments"
   | "teleconsultation"
   | "health-records"
+  | "prescriptions"
   | "notifications"
   | "doctor-portal"
   | "analytics"
@@ -240,6 +243,7 @@ const MainApp: React.FC = () => {
     { id: "appointments" as View, icon: <Calendar className="h-5 w-5" />, label: t('nav.appointments') },
     { id: "teleconsultation" as View, icon: <Video className="h-5 w-5" />, label: t('nav.teleconsultation') },
     { id: "health-records" as View, icon: <FileText className="h-5 w-5" />, label: t('nav.healthRecords') },
+    { id: "prescriptions" as View, icon: <Pill className="h-5 w-5" />, label: 'Prescriptions' },
     { id: "mobile-health" as View, icon: <Smartphone className="h-5 w-5" />, label: t('nav.mobileHealth') },
     { id: "notifications" as View, icon: <Bell className="h-5 w-5" />, label: t('nav.notifications'), badge: 2 },
   ];
@@ -248,6 +252,7 @@ const MainApp: React.FC = () => {
     { id: "doctor-portal" as View, icon: <Stethoscope className="h-5 w-5" />, label: t('nav.doctorPortal') },
     { id: "appointments" as View, icon: <Calendar className="h-5 w-5" />, label: t('nav.appointments') },
     { id: "teleconsultation" as View, icon: <Video className="h-5 w-5" />, label: t('nav.consultation') },
+    { id: "prescriptions" as View, icon: <Pill className="h-5 w-5" />, label: 'Prescriptions' },
     { id: "notifications" as View, icon: <Bell className="h-5 w-5" />, label: t('nav.notifications'), badge: 3 },
   ];
 
@@ -328,6 +333,8 @@ const MainApp: React.FC = () => {
         return <Teleconsultation appointment={consultationAppointment ?? undefined} />;
       case "health-records":
         return <HealthRecords />;
+      case "prescriptions":
+        return <Prescriptions />;
       case "notifications":
         return <Notifications />;
       case "doctor-portal":

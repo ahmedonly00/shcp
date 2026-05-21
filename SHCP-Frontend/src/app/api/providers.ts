@@ -1,5 +1,5 @@
 import { apiClient, unwrap, unwrapPage } from './client';
-import { ApiProviderSummary, ApiProviderProfile, ApiSlot, ApiAppointmentDto, ApiHealthRecordDto, ApiInstantAvailableProvider } from '@/app/types';
+import { ApiProviderSummary, ApiProviderProfile, ApiSlot, ApiAppointmentDto, ApiHealthRecordDto, ApiInstantAvailableProvider, ApiSymptomReport } from '@/app/types';
 
 export interface UpdateProviderRequest {
   name?: string;
@@ -41,6 +41,10 @@ export const providersApi = {
 
   getPatientEhr: (patientId: string) =>
     apiClient.get<ApiHealthRecordDto>(`/providers/me/patients/${patientId}/ehr`).then(unwrap<ApiHealthRecordDto>),
+
+  getPatientLatestSymptomReport: (patientId: string) =>
+    apiClient.get<ApiSymptomReport | null>(`/providers/me/patients/${patientId}/symptom-reports/latest`)
+      .then(unwrap<ApiSymptomReport | null>),
 
   addSlot: (slot: { startTime: string; endTime: string; appointmentType?: string }) =>
     apiClient.post('/providers/me/availability/slots', slot).then(unwrap<ApiSlot>),

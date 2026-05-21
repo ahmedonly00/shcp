@@ -18,7 +18,7 @@ import { patientsApi } from '@/app/api/patients';
 import { providersApi } from '@/app/api/providers';
 import { referralsApi } from '@/app/api/referrals';
 import { prescriptionsApi, MedicationItem } from '@/app/api/prescriptions';
-import { ApiConsultationDto, ApiHealthRecordDto, ApiInstantAvailableProvider, ApiPrescriptionDto, ApiSymptomReport, Appointment, mapApiAppointment, isAppointmentExpired } from '@/app/types';
+import { ApiConsultationDto, ApiHealthRecordDto, ApiInstantAvailableProvider, ApiPrescriptionDto, ApiSymptomReport, ApiSymptomReportSummary, Appointment, mapApiAppointment, isAppointmentExpired } from '@/app/types';
 import { useAuth } from '@/app/context/AuthContext';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/app/components/ui/dialog';
 
@@ -175,8 +175,10 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
   const [issuedRxList, setIssuedRxList] = useState<ApiPrescriptionDto[]>([]);
 
   const [ehrSummary, setEhrSummary] = useState<ApiHealthRecordDto | null>(null);
-  const [symptomReport, setSymptomReport] = useState<ApiSymptomReport | null>(null);
+  const [symptomReport, setSymptomReport] = useState<ApiSymptomReport | ApiSymptomReportSummary | null>(null);
   const [loadingPatientInfo, setLoadingPatientInfo] = useState(false);
+  const [endedPrescriptions, setEndedPrescriptions] = useState<ApiPrescriptionDto[]>([]);
+  const [loadingEndedRx, setLoadingEndedRx] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
 
@@ -335,27 +337,45 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
     })();
   }, [networkQuality]);
 
-  // Fetch patient info when peer connects
+  // Fetch patient info once the consultation is active
   useEffect(() => {
-    if (!peerConnected || !appointment) return;
+    if (phase !== 'active') return;
+    const patientId = appointment?.patientId ?? consultationRef.current?.patientId;
+    if (!patientId) return;
     setLoadingPatientInfo(true);
+    setEhrSummary(null);
+    setSymptomReport(null);
     (async () => {
-      try {
-        if (isProvider) {
-          const ehr = await providersApi.getPatientEhr(appointment.patientId);
-          setEhrSummary(ehr);
-        } else {
-          const [reports, ehr] = await Promise.allSettled([
-            patientsApi.getMySymptomReports(0, 1),
-            patientsApi.getMyEhr(),
-          ]);
-          if (reports.status === 'fulfilled') setSymptomReport(reports.value[0] ?? null);
-          if (ehr.status === 'fulfilled') setEhrSummary(ehr.value);
-        }
-      } catch { /* ignore */ }
-      finally { setLoadingPatientInfo(false); }
+      if (isProvider) {
+        const [ehr, report] = await Promise.allSettled([
+          providersApi.getPatientEhr(patientId),
+          providersApi.getPatientLatestSymptomReport(patientId),
+        ]);
+        if (ehr.status === 'fulfilled') setEhrSummary(ehr.value);
+        if (report.status === 'fulfilled' && report.value) setSymptomReport(report.value as ApiSymptomReport);
+      } else {
+        const [reports, ehr] = await Promise.allSettled([
+          patientsApi.getMySymptomReports(0, 1),
+          patientsApi.getMyEhr(),
+        ]);
+        if (reports.status === 'fulfilled') setSymptomReport(reports.value[0] ?? null);
+        if (ehr.status === 'fulfilled') setEhrSummary(ehr.value);
+      }
+      setLoadingPatientInfo(false);
     })();
-  }, [peerConnected, appointment, isProvider]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [phase, appointment, isProvider]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch prescriptions issued during this consultation when the call ends (patient only)
+  useEffect(() => {
+    if (phase !== 'ended' || isProvider) return;
+    const consultId = consultationRef.current?.consultationId;
+    if (!consultId) return;
+    setLoadingEndedRx(true);
+    prescriptionsApi.getByConsultation(consultId)
+      .then(list => setEndedPrescriptions(list ?? []))
+      .catch(() => setEndedPrescriptions([]))
+      .finally(() => setLoadingEndedRx(false));
+  }, [phase, isProvider]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -410,6 +430,24 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
           to: remotePeerSocketIdRef.current,
           candidate,
         });
+      }
+    };
+
+    // Warn if ICE gathering stalls — helps diagnose TURN/firewall issues locally
+    let iceGatheringTimer: ReturnType<typeof setTimeout> | null = null;
+    pc.onicegatheringstatechange = () => {
+      if (pc.iceGatheringState === 'gathering') {
+        iceGatheringTimer = setTimeout(() => {
+          if (pc.iceGatheringState === 'gathering') {
+            addSystemMessage(
+              'ICE gathering is taking longer than expected. ' +
+              'If the call does not connect, check that both devices allow camera/mic access ' +
+              'and that the TURN server is reachable.'
+            );
+          }
+        }, 8000);
+      } else if (pc.iceGatheringState === 'complete') {
+        if (iceGatheringTimer) { clearTimeout(iceGatheringTimer); iceGatheringTimer = null; }
       }
     };
 
@@ -525,16 +563,17 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
       timeout: 10000,
     });
 
-    // ── 20-second hard timeout — if the signaling server never sends 'joined'
-    // (server down, token rejected, firewall, etc.) release the camera and
-    // return the user to the waiting room instead of hanging forever.
+    // ── 40-second hard timeout — if the signaling server never sends 'joined'
+    // or 'in-lobby' (server down, token rejected, firewall, etc.) release the
+    // camera and return the user to the waiting room instead of hanging forever.
+    // 40 s gives enough room for slow permission prompts + cold server starts.
     connectionTimeoutRef.current = setTimeout(() => {
       if (phaseRef.current === 'connecting') {
         cleanup(false);
         updatePhase('waiting');
         toast.error('Could not connect to the consultation room. Please try again.');
       }
-    }, 20000);
+    }, 40000);
 
     socket.on('connect', () => {
       setConnectionStatus('connecting');
@@ -549,7 +588,8 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
       }
       addSystemMessage('Joined consultation room. Waiting for peer…');
       updatePhase('active');
-      consultationsApi.logAuditEvent(consultationRef.current!.consultationId, 'JOINED');
+      const cid1 = consultationRef.current?.consultationId;
+      if (cid1) consultationsApi.logAuditEvent(cid1, 'JOINED');
 
       if (peers.length > 0) {
         initiateOffer(peers[0].socketId);
@@ -574,15 +614,16 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
       }
       updatePhase('lobby');
       addSystemMessage('You are in the waiting room. The provider will admit you shortly.');
-      consultationsApi.logAuditEvent(consultationRef.current!.consultationId, 'JOINED',
-        '{"location":"lobby"}');
+      const cid2 = consultationRef.current?.consultationId;
+      if (cid2) consultationsApi.logAuditEvent(cid2, 'JOINED', '{"location":"lobby"}');
     });
 
     // ── PATIENT: provider admitted them ───────────────────────────────────────
     socket.on('admitted', ({ peers }: { roomId: string; peers: Array<{ userId: string; role: string; socketId: string }> }) => {
       updatePhase('active');
       addSystemMessage('You have been admitted to the consultation.');
-      consultationsApi.logAuditEvent(consultationRef.current!.consultationId, 'ADMITTED');
+      const cid3 = consultationRef.current?.consultationId;
+      if (cid3) consultationsApi.logAuditEvent(cid3, 'ADMITTED');
       // Patient initiates the offer since peers[0] is the provider already in the room
       if (peers.length > 0) {
         initiateOffer(peers[0].socketId);
@@ -649,7 +690,16 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
     });
 
     socket.on('error', ({ message }: { message: string }) => {
-      toast.error(`Signaling error: ${message}`);
+      // If the server rejects the join (expired token, room full, unauthorized),
+      // the socket stays open but the user is stuck in 'connecting' forever
+      // because no 'joined' / 'in-lobby' event ever arrives.
+      // Immediately release the camera and send them back rather than waiting
+      // for the 40-second hard timeout.
+      if (phaseRef.current === 'connecting') {
+        cleanup(false);
+        updatePhase('waiting');
+      }
+      toast.error(`Could not join consultation: ${message}`);
     });
 
     // Socket.io failed to reach the server (network error, wrong URL, CORS, etc.)
@@ -672,11 +722,15 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
 
     socket.on('disconnect', (reason) => {
       setConnectionStatus('disconnected');
-      // If we were still setting up, release the camera and send user back
-      if (phaseRef.current === 'connecting') {
+      // 'io server disconnect' = server explicitly kicked us (bad token, room error).
+      // Every other reason (transport close, ping timeout, transport error) is a
+      // transient network event — Socket.io will reconnect automatically, so do NOT
+      // call cleanup here. Calling cleanup stops the camera/mic and forces a
+      // new getUserMedia on retry, which re-prompts the browser for permissions.
+      if (reason === 'io server disconnect' && phaseRef.current === 'connecting') {
         cleanup(false);
         updatePhase('waiting');
-        toast.error(`Disconnected before joining: ${reason}. Please try again.`);
+        toast.error('Disconnected by server before joining. Please try again.');
       }
     });
 
@@ -710,19 +764,25 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
 
   const getUserMedia = async (): Promise<MediaStream> => {
     try {
+      // Always request both tracks regardless of pre-call toggle state.
+      // Applying video: false would permanently omit the video track, making
+      // toggle-on during the call silently fail (no track to re-enable).
+      // Instead, acquire full media and honour the toggle via track.enabled.
       const stream = await navigator.mediaDevices.getUserMedia({
-        // Cap at 720p / 30 fps — adaptive bitrate will reduce further if bandwidth is low.
-        video: videoEnabled
-          ? { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { max: 30 } }
-          : false,
-        audio: audioEnabled,
+        video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { max: 30 } },
+        audio: true,
       });
+      stream.getVideoTracks().forEach(t => { t.enabled = videoEnabled; });
+      stream.getAudioTracks().forEach(t =>  { t.enabled = audioEnabled; });
       localStreamRef.current = stream;
-      setLocalStream(stream); // triggers effect to attach to video element once it mounts
+      setLocalStream(stream);
       return stream;
     } catch (err) {
-      if (err instanceof DOMException && err.name === 'NotAllowedError') {
-        throw new Error('Camera/microphone access denied. Please allow access in your browser settings and reload.');
+      if (err instanceof DOMException) {
+        if (err.name === 'NotAllowedError')
+          throw new Error('Camera/microphone access denied. Please allow access in your browser settings and reload.');
+        if (err.name === 'NotReadableError' || err.name === 'TrackStartError')
+          throw new Error('Camera or microphone is already in use by another application (e.g. another browser tab or app). Close it and try again.');
       }
       throw new Error('Could not access camera or microphone. Check your device connections.');
     }
@@ -1185,17 +1245,26 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
   if (phase === 'ended') {
     return (
       <div className="space-y-6">
+        {/* Summary card */}
         <Card>
           <CardContent className="pt-6">
-            <div className="text-center py-12 space-y-4">
-              <div className="h-20 w-20 bg-muted rounded-full flex items-center justify-center mx-auto">
-                <PhoneOff className="h-10 w-10 text-muted-foreground" />
+            <div className="text-center py-8 space-y-4">
+              <div className="h-20 w-20 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+                <CheckCircle className="h-10 w-10 text-green-600" />
               </div>
               <h3 className="text-xl font-semibold">{t('teleconsultation.consultationEnded')}</h3>
-              <p className="text-muted-foreground">{t('teleconsultation.duration')}: {formatDuration(callDuration)}</p>
+              {!isProvider && (
+                <p className="text-muted-foreground text-sm max-w-sm mx-auto">
+                  Thank you for your consultation. Your session summary and any prescriptions are shown below.
+                </p>
+              )}
+              <p className="text-muted-foreground text-sm">
+                {t('teleconsultation.duration')}: {formatDuration(callDuration)}
+              </p>
               <Button onClick={() => {
                 updatePhase('waiting');
                 setCallDuration(0);
+                setEndedPrescriptions([]);
                 setChatMessages([{
                   sender: 'System',
                   message: 'Please wait while the connection is established.',
@@ -1209,6 +1278,65 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
             </div>
           </CardContent>
         </Card>
+
+        {/* Prescription card — patient only */}
+        {!isProvider && (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Pill className="h-4 w-4 text-blue-600" />
+                Your Prescription
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loadingEndedRx ? (
+                <div className="flex justify-center py-6">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : endedPrescriptions.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No prescription was issued for this consultation.
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  {endedPrescriptions.map(rx => {
+                    let meds: Array<{ name: string; dosage?: string; frequency?: string; durationDays?: number }> = [];
+                    try { meds = JSON.parse(rx.medications) ?? []; } catch { meds = []; }
+                    return (
+                      <div key={rx.prescriptionId} className="border rounded-lg p-4 space-y-3 bg-blue-50 border-blue-200">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-semibold text-blue-800">Issued by Dr. {rx.providerName}</p>
+                          <Badge className="bg-blue-100 text-blue-800 border-blue-300 text-xs">
+                            Valid until {rx.validUntil.split('T')[0]}
+                          </Badge>
+                        </div>
+                        <div className="space-y-2">
+                          {meds.map((med, i) => (
+                            <div key={i} className="bg-white rounded p-2 text-sm border border-blue-100">
+                              <p className="font-medium text-gray-800">{med.name}</p>
+                              <p className="text-muted-foreground text-xs">
+                                {[med.dosage, med.frequency, med.durationDays ? `${med.durationDays} days` : null]
+                                  .filter(Boolean).join(' · ')}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                        {rx.instructions && (
+                          <p className="text-xs text-blue-700 italic">{rx.instructions}</p>
+                        )}
+                        {rx.pharmacyName && (
+                          <p className="text-xs text-muted-foreground flex items-center gap-1">
+                            <Building2 className="h-3 w-3" /> Sent to {rx.pharmacyName}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
     );
   }
@@ -1306,7 +1434,7 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
                     ) : (
                       myAppointments.map(apt => (
                         <button key={apt.id} onClick={() => setActiveAppointment(apt)}
-                          className="w-full text-left border rounded-lg p-3 hover:bg-blue-50 hover:border-blue-300 transition-colors">
+                          className="w-full text-left border rounded-lg p-3 hover:bg-secondary hover:border-primary/30 transition-colors">
                           <div className="flex items-center justify-between">
                             <div>
                               <p className="font-medium text-sm">{apt.patientName}</p>
@@ -1322,7 +1450,7 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
 
                 {appointment && (
                   <>
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div className="bg-secondary border border-border rounded-lg p-4">
                       <div className="flex items-center justify-between mb-2">
                         <h4 className="font-medium text-sm">Appointment Details</h4>
                         <button onClick={() => setActiveAppointment(undefined)} className="text-xs text-muted-foreground hover:underline">Change</button>
@@ -1481,7 +1609,7 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
                       <button
                         key={apt.id}
                         onClick={() => setActiveAppointment(apt)}
-                        className="w-full text-left border rounded-lg p-3 hover:bg-blue-50 hover:border-blue-300 transition-colors"
+                        className="w-full text-left border rounded-lg p-3 hover:bg-secondary hover:border-primary/30 transition-colors"
                       >
                         <div className="flex items-center justify-between">
                           <div>
@@ -1499,7 +1627,7 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
               )}
 
               {appointment && (
-                <div className="max-w-md mx-auto bg-blue-50 border border-blue-200 rounded-lg p-4 text-left">
+                <div className="max-w-md mx-auto bg-secondary border border-border rounded-lg p-4 text-left">
                   <div className="flex items-center justify-between mb-2">
                     <h4 className="font-medium">Appointment Details</h4>
                     <button onClick={() => setActiveAppointment(undefined)} className="text-xs text-muted-foreground hover:underline">Change</button>
@@ -1613,7 +1741,7 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
   return (
     <div className="space-y-4">
       {/* Status Bar */}
-      <Card className="bg-gradient-to-r from-blue-600 to-blue-700 text-white">
+      <Card className="bg-primary text-primary-foreground">
         <CardContent className="py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -1732,7 +1860,7 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
                 />
                 {/* Placeholder when remote not connected */}
                 {!peerConnected && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-blue-900 to-blue-700">
+                  <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-[#002d44] to-[#005A87]">
                     <div className="text-center text-white">
                       <div className="h-24 w-24 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
                         <User className="h-12 w-12" />
@@ -1911,7 +2039,7 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
                     >
                       <div className={`max-w-[80%] rounded-lg p-3 ${
                         msg.sender === 'You'
-                          ? 'bg-blue-600 text-white'
+                          ? 'bg-primary text-primary-foreground'
                           : msg.sender === 'System'
                           ? 'bg-muted text-muted-foreground text-center w-full'
                           : 'bg-muted text-foreground'
@@ -1954,54 +2082,67 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Latest Symptom Report</p>
                         <div className="border rounded-lg p-3 space-y-1 text-sm bg-amber-50 border-amber-200">
                           <div className="flex items-center justify-between">
-                            <span className="font-medium text-amber-800">{symptomReport.aiPathway}</span>
+                            <span className="font-medium text-amber-800">{symptomReport.aiPathway ?? '—'}</span>
                             <Badge className={
                               symptomReport.aiUrgency === 'EMERGENCY' ? 'bg-red-500 text-white' :
-                              symptomReport.aiUrgency === 'HIGH' ? 'bg-orange-500 text-white' :
-                              symptomReport.aiUrgency === 'MODERATE' ? 'bg-yellow-500 text-white' :
+                              symptomReport.aiUrgency === 'URGENT'    ? 'bg-orange-500 text-white' :
+                              symptomReport.aiUrgency === 'ROUTINE'   ? 'bg-yellow-500 text-white' :
                               'bg-green-500 text-white'
                             }>
                               {symptomReport.aiUrgency}
                             </Badge>
                           </div>
-                          <p className="text-muted-foreground text-xs">{symptomReport.careRecommendation}</p>
+                          <p className="text-muted-foreground text-xs">{symptomReport.careRecommendation ?? 'No recommendation recorded'}</p>
                           <p className="text-muted-foreground/70 text-xs">{symptomReport.createdAt.split('T')[0]}</p>
                         </div>
                       </div>
                     )}
 
                     {/* EHR Summary */}
-                    {ehrSummary && (
-                      <>
-                        {(['allergies', 'medications', 'diagnoses'] as (keyof ApiHealthRecordDto)[]).map(key => {
-                          let items: Record<string, string>[] = [];
-                          try { items = JSON.parse(ehrSummary[key] as string) ?? []; } catch { items = []; }
-                          const label = key === 'allergies' ? 'Allergies' : key === 'medications' ? 'Active Medications' : 'Diagnoses';
-                          const color = key === 'allergies' ? 'bg-red-50 border-red-200 text-red-700'
-                            : key === 'medications' ? 'bg-blue-50 border-blue-200 text-blue-700'
-                            : 'bg-purple-50 border-purple-200 text-purple-700';
-                          if (items.length === 0) return null;
-                          return (
-                            <div key={key}>
-                              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">{label}</p>
-                              <div className={`border rounded-lg p-2 space-y-1 ${color}`}>
-                                {items.slice(0, 4).map((item, i) => (
-                                  <p key={i} className="text-xs">
-                                    <span className="font-medium">{item.name || item.allergen || item.diagnosis || `Entry ${i+1}`}</span>
-                                    {item.dosage && <span className="opacity-70"> — {item.dosage}</span>}
-                                  </p>
-                                ))}
-                                {items.length > 4 && <p className="text-xs opacity-60">+{items.length - 4} more</p>}
+                    {ehrSummary && (() => {
+                      const sections = (['allergies', 'medications', 'diagnoses'] as (keyof ApiHealthRecordDto)[]).map(key => {
+                        let items: Record<string, string>[] = [];
+                        try { items = JSON.parse(ehrSummary[key] as string) ?? []; } catch { items = []; }
+                        return { key, items };
+                      });
+                      const hasAny = sections.some(s => s.items.length > 0);
+                      return (
+                        <>
+                          {sections.map(({ key, items }) => {
+                            const label = key === 'allergies' ? 'Allergies' : key === 'medications' ? 'Active Medications' : 'Diagnoses';
+                            const color = key === 'allergies' ? 'bg-red-50 border-red-200 text-red-700'
+                              : key === 'medications' ? 'bg-blue-50 border-blue-200 text-blue-700'
+                              : 'bg-purple-50 border-purple-200 text-purple-700';
+                            const emptyColor = key === 'allergies' ? 'text-red-400' : key === 'medications' ? 'text-blue-400' : 'text-purple-400';
+                            return (
+                              <div key={key}>
+                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">{label}</p>
+                                {items.length > 0 ? (
+                                  <div className={`border rounded-lg p-2 space-y-1 ${color}`}>
+                                    {items.slice(0, 4).map((item, i) => (
+                                      <p key={i} className="text-xs">
+                                        <span className="font-medium">{item.name || item.allergen || item.diagnosis || `Entry ${i+1}`}</span>
+                                        {item.dosage && <span className="opacity-70"> — {item.dosage}</span>}
+                                      </p>
+                                    ))}
+                                    {items.length > 4 && <p className="text-xs opacity-60">+{items.length - 4} more</p>}
+                                  </div>
+                                ) : (
+                                  <p className={`text-xs ${emptyColor} italic`}>None on file</p>
+                                )}
                               </div>
-                            </div>
-                          );
-                        })}
-                      </>
-                    )}
+                            );
+                          })}
+                          {!hasAny && !symptomReport && (
+                            <p className="text-xs text-muted-foreground/60 text-center pt-2">No clinical history recorded yet</p>
+                          )}
+                        </>
+                      );
+                    })()}
 
                     {!ehrSummary && !symptomReport && (
                       <p className="text-sm text-muted-foreground/70 text-center py-8">
-                        {peerConnected ? 'No patient data available' : 'Connect to view patient info'}
+                        {phase === 'active' ? 'No patient data available' : 'Connect to view patient info'}
                       </p>
                     )}
                   </>
@@ -2030,7 +2171,7 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
                       External Institution
                     </button>
                     <button
-                      className={`flex-1 py-2 font-medium transition-colors ${referralType === 'INTERNAL' ? 'bg-blue-600 text-white' : 'text-muted-foreground hover:bg-muted/50'}`}
+                      className={`flex-1 py-2 font-medium transition-colors ${referralType === 'INTERNAL' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted/50'}`}
                       onClick={() => setReferralType('INTERNAL')}
                     >
                       Internal Specialist
@@ -2185,7 +2326,7 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
                           <div className="flex items-center gap-2">
                             <CheckCircle className="h-4 w-4 text-green-600 shrink-0" />
                             <span className="text-xs font-semibold text-green-800">
-                              {meds.length} medication{meds.length !== 1 ? 's' : ''} · valid until {rx.validUntil}
+                              {meds.length} medication{meds.length !== 1 ? 's' : ''} · valid until {rx.validUntil?.split('T')[0]}
                             </span>
                           </div>
                           {meds.map((m, i) => (
