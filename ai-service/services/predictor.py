@@ -14,8 +14,6 @@ from datetime import datetime, timezone
 
 import numpy as np
 
-from app.services.pathway import determine_pathway
-
 logger = logging.getLogger(__name__)
 
 # ── paths ──────────────────────────────────────────────────────────────────────
@@ -48,6 +46,10 @@ _symptom_columns = None
 _urgency_map     = None
 _explainer       = None
 _loaded          = False
+
+
+def is_model_ready() -> bool:
+    return _loaded
 
 
 def _load_models() -> None:
@@ -136,6 +138,14 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+# ── eager load at import time (runs in Gunicorn master when preload_app=True) ──
+# This ensures models are loaded once before workers fork rather than lazily
+# per-worker on the first request (which was causing timeout-kill loops).
+try:
+    _load_models()
+except Exception as _exc:
+    logger.warning("Eager model load failed at import: %s — will retry on first request", _exc)
+
 # ── public API ─────────────────────────────────────────────────────────────────
 
 def predict(
@@ -160,6 +170,9 @@ def predict(
     Returns:
         dict with status, disease, icd10, confidence, urgency, explaining_factors, etc.
     """
+    # Deferred import avoids circular dependency at module level:
+    # predictor (module load) → app.__init__ → analysis → predictor (partially loaded)
+    from app.services.pathway import determine_pathway  # noqa: PLC0415
     _load_models()
 
     # ── 1. numpy reshape ──────────────────────────────────────────────────────

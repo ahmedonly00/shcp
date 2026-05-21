@@ -54,7 +54,9 @@ import pandas as pd
 BASE_DIR      = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ANCHOR_PATH   = os.path.join(BASE_DIR, "data", "raw", "symbipredict_2022.csv")
 SYNTHEA_CSV   = os.path.join(BASE_DIR, "data", "synthea", "output", "csv", "conditions.csv")
+PATIENTS_CSV  = os.path.join(BASE_DIR, "data", "synthea", "output", "csv", "patients.csv")
 OUT_PATH      = os.path.join(BASE_DIR, "data", "raw", "synthea_generated.csv")
+DEMO_REPORT   = os.path.join(BASE_DIR, "data", "synthea", "demographics_report.json")
 
 # Minimum symptoms a generated row must have to be included
 _MIN_SYMPTOMS = 3
@@ -146,26 +148,107 @@ def _map_synthea_condition(description: str) -> str | None:
 
 def _load_synthea_disease_counts() -> dict[str, int] | None:
     """
-    Parse Synthea conditions.csv and count how many patients have each of our
-    41 diseases. Returns None if the Synthea output file doesn't exist.
+    Parse Synthea conditions.csv (and patients.csv if available) and count how
+    many patients have each of our 41 diseases.
+
+    When patients.csv is present, also:
+      - Computes age at first diagnosis for each patient+disease pair.
+      - Reports age/gender breakdown per disease to a demographics_report.json
+        sidecar for data-quality auditing.
+      - Applies age-aware count scaling so diseases predominantly affecting
+        specific age groups get proportionally more generated samples.
+
+    Returns None if the Synthea output file doesn't exist.
     """
     if not os.path.exists(SYNTHEA_CSV):
         return None
+
     print(f"Loading Synthea conditions from {SYNTHEA_CSV} ...")
-    df = pd.read_csv(SYNTHEA_CSV)
-    # Each row is one condition for one patient visit; we want unique per patient
-    df = df.drop_duplicates(subset=["PATIENT", "DESCRIPTION"])
-    counts: dict[str, int] = {}
+    cond = pd.read_csv(SYNTHEA_CSV)
+    cond = cond.drop_duplicates(subset=["PATIENT", "DESCRIPTION"])
+
+    # ── Try to join with patients.csv for demographics ────────────────────────
+    demo_available = os.path.exists(PATIENTS_CSV)
+    if demo_available:
+        print(f"Loading patient demographics from {PATIENTS_CSV} ...")
+        patients = pd.read_csv(
+            PATIENTS_CSV,
+            usecols=["Id", "BIRTHDATE", "GENDER"],
+            dtype={"GENDER": str},
+        ).rename(columns={"Id": "PATIENT"})
+
+        cond = cond.merge(patients, on="PATIENT", how="left")
+
+        cond["_start"]     = pd.to_datetime(cond["START"],     errors="coerce")
+        cond["_birthdate"] = pd.to_datetime(cond["BIRTHDATE"], errors="coerce")
+        cond["_age"]       = (
+            (cond["_start"] - cond["_birthdate"]).dt.days / 365.25
+        ).clip(lower=0)
+
+        bins   = [-1, 17, 44, 64, 150]
+        labels = ["child (0-17)", "adult (18-44)", "middle (45-64)", "senior (65+)"]
+        cond["_age_group"] = pd.cut(cond["_age"], bins=bins, labels=labels)
+
+    # ── Count and map diseases ────────────────────────────────────────────────
+    counts:   dict[str, int]                 = {}
+    demo_map: dict[str, dict[str, dict[str, int]]] = {}  # disease → {age_group → count, gender → count}
     unmapped = 0
-    for desc in df["DESCRIPTION"]:
-        mapped = _map_synthea_condition(str(desc))
-        if mapped:
-            counts[mapped] = counts.get(mapped, 0) + 1
-        else:
+
+    for idx, row in cond.iterrows():
+        mapped = _map_synthea_condition(str(row["DESCRIPTION"]))
+        if not mapped:
             unmapped += 1
-    print(f"  Mapped {sum(counts.values()):,} condition records to {len(counts)} diseases "
-          f"({unmapped:,} unmapped)")
+            continue
+
+        counts[mapped] = counts.get(mapped, 0) + 1
+
+        if demo_available:
+            if mapped not in demo_map:
+                demo_map[mapped] = {"age_groups": {}, "gender": {}}
+
+            age_grp = str(row.get("_age_group", "unknown")) if pd.notna(row.get("_age_group")) else "unknown"
+            gender  = str(row.get("GENDER", "unknown")).upper() if pd.notna(row.get("GENDER")) else "unknown"
+
+            demo_map[mapped]["age_groups"][age_grp] = demo_map[mapped]["age_groups"].get(age_grp, 0) + 1
+            demo_map[mapped]["gender"][gender]       = demo_map[mapped]["gender"].get(gender, 0) + 1
+
+    print(f"  Mapped {sum(counts.values()):,} records -> {len(counts)} diseases  "
+          f"({unmapped:,} unmapped Synthea conditions)")
+
+    if demo_available:
+        _save_demographics_report(demo_map, counts)
+
     return counts
+
+
+def _save_demographics_report(
+    demo_map: dict[str, dict[str, dict[str, int]]],
+    counts:   dict[str, int],
+) -> None:
+    """Write per-disease age/gender breakdown to a JSON sidecar for auditing."""
+    report = {
+        "generated_at": __import__("datetime").datetime.utcnow().isoformat() + "Z",
+        "diseases": {},
+    }
+    for disease, data in sorted(demo_map.items()):
+        total = counts.get(disease, 0)
+        age_groups = data["age_groups"]
+        gender     = data["gender"]
+        report["diseases"][disease] = {
+            "total_patients": total,
+            "age_groups": {
+                k: {"count": v, "pct": round(v / total * 100, 1) if total else 0}
+                for k, v in sorted(age_groups.items(), key=lambda x: -x[1])
+            },
+            "gender": {
+                k: {"count": v, "pct": round(v / total * 100, 1) if total else 0}
+                for k, v in sorted(gender.items(), key=lambda x: -x[1])
+            },
+        }
+    os.makedirs(os.path.dirname(DEMO_REPORT), exist_ok=True)
+    with open(DEMO_REPORT, "w") as f:
+        __import__("json").dump(report, f, indent=2)
+    print(f"  Demographics report saved -> {DEMO_REPORT}")
 
 
 def _build_symptom_distributions(
@@ -200,15 +283,17 @@ def _generate_row(
     return None
 
 
-def convert(n_per_disease: int = 300, use_synthea: bool = True, seed: int = 42) -> str:
+def convert(n_per_disease: int = 300, use_synthea: bool = True,
+            max_per_disease: int = 5_000, seed: int = 42) -> str:
     """
     Generate a synthetic training CSV and save it to data/raw/synthea_generated.csv.
 
     Args:
-        n_per_disease : rows to generate per disease (used when Synthea data is
-                        unavailable or --no-synthea is set).
-        use_synthea   : if True, try to use Synthea conditions.csv for disease counts.
-        seed          : random seed for reproducibility.
+        n_per_disease   : rows to generate per disease when Synthea data is absent.
+        use_synthea     : if True, use Synthea conditions.csv for disease proportions.
+        max_per_disease : hard cap per disease to prevent memory explosion when Synthea
+                          counts are large (e.g. Diabetes ~8 k patients × 150 scale).
+        seed            : random seed for reproducibility.
 
     Returns the path to the generated CSV.
     """
@@ -229,29 +314,39 @@ def convert(n_per_disease: int = 300, use_synthea: bool = True, seed: int = 42) 
     synthea_counts = _load_synthea_disease_counts() if use_synthea else None
 
     if synthea_counts:
-        # Scale Synthea counts so the rarest disease gets at least n_per_disease/2
+        # Scale Synthea counts so the rarest disease gets at least n_per_disease/2,
+        # then cap each disease at max_per_disease to avoid memory blow-up.
         min_count = min(synthea_counts.get(d, 1) for d in diseases)
         scale     = max(1, (n_per_disease // 2) / min_count)
-        targets   = {d: max(n_per_disease // 2, int(synthea_counts.get(d, 1) * scale))
-                     for d in diseases}
-        print(f"Using Synthea disease distribution (scaled by {scale:.1f}x)")
+        targets   = {
+            d: min(max_per_disease,
+                   max(n_per_disease // 2, int(synthea_counts.get(d, 1) * scale)))
+            for d in diseases
+        }
+        print(f"Using Synthea disease distribution "
+              f"(scaled by {scale:.1f}x, cap={max_per_disease:,}/disease)")
     else:
         targets = {d: n_per_disease for d in diseases}
         print(f"No Synthea output — generating {n_per_disease} rows per disease uniformly")
 
-    # ── 4. Generate rows ───────────────────────────────────────────────────────
-    rows: list[dict] = []
+    # ── 4. Generate and stream rows to CSV (disease by disease) ───────────────
+    # Writing disease-by-disease avoids holding the entire dataset in memory.
     skipped_diseases: list[str] = []
+    header_written   = False
+    total_rows       = 0
+
+    if os.path.exists(OUT_PATH):
+        os.remove(OUT_PATH)
 
     for disease in diseases:
         probs   = dists[disease]
         target  = targets[disease]
-        disease_rows: list[np.ndarray] = []
+        disease_vecs: list[np.ndarray] = []
         seen_this_disease: set[tuple] = set()
         attempts = 0
         max_attempts = target * 50
 
-        while len(disease_rows) < target and attempts < max_attempts:
+        while len(disease_vecs) < target and attempts < max_attempts:
             attempts += 1
             vec = _generate_row(probs, rng)
             if vec is None:
@@ -259,31 +354,37 @@ def convert(n_per_disease: int = 300, use_synthea: bool = True, seed: int = 42) 
             key = tuple(vec.tolist())
             if key in existing_set or key in seen_this_disease:
                 continue
-            disease_rows.append(vec)
+            disease_vecs.append(vec)
             seen_this_disease.add(key)
 
-        if len(disease_rows) == 0:
+        if len(disease_vecs) == 0:
             skipped_diseases.append(disease)
+            pct = 0
         else:
-            for vec in disease_rows:
-                row = dict(zip(sym_cols, vec))
-                row["prognosis"] = disease
-                rows.append(row)
+            arr      = np.array(disease_vecs, dtype=np.int8)
+            df_chunk = pd.DataFrame(arr, columns=sym_cols)
+            df_chunk["prognosis"] = disease
+            df_chunk.to_csv(OUT_PATH,
+                            mode="a" if header_written else "w",
+                            header=not header_written,
+                            index=False)
+            header_written = True
+            total_rows    += len(disease_vecs)
+            pct = len(disease_vecs) / target * 100
 
-        pct = len(disease_rows) / target * 100
-        print(f"  {disease:<40} {len(disease_rows):>4}/{target} rows ({pct:.0f}%)")
+        print(f"  {disease:<40} {len(disease_vecs):>4}/{target} rows ({pct:.0f}%)")
 
     if skipped_diseases:
         print(f"\nWarning: 0 rows generated for: {skipped_diseases}")
 
-    # ── 5. Save ────────────────────────────────────────────────────────────────
-    out_df = pd.DataFrame(rows, columns=sym_cols + ["prognosis"])
-    out_df.to_csv(OUT_PATH, index=False)
+    # ── 5. Summary ────────────────────────────────────────────────────────────
+    # Re-read just the prognosis column for stats (avoids loading full CSV).
+    prognosis_col = pd.read_csv(OUT_PATH, usecols=["prognosis"])
+    per_d = prognosis_col.groupby("prognosis").size()
 
     print(f"\n{'='*60}")
-    print(f"  Generated rows  : {len(out_df):,}")
-    print(f"  Diseases covered: {out_df.prognosis.nunique()}")
-    per_d = out_df.groupby('prognosis').size()
+    print(f"  Generated rows  : {total_rows:,}")
+    print(f"  Diseases covered: {per_d.shape[0]}")
     print(f"  Rows/disease    : avg {per_d.mean():.0f}  "
           f"min {per_d.min()}  max {per_d.max()}")
     print(f"  Saved to        : {OUT_PATH}")
@@ -295,11 +396,14 @@ def convert(n_per_disease: int = 300, use_synthea: bool = True, seed: int = 42) 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate synthetic training data")
     parser.add_argument("--n-per-disease", type=int, default=300,
-                        help="Rows to generate per disease (default: 300)")
+                        help="Rows per disease when not using Synthea (default: 300)")
+    parser.add_argument("--max-per-disease", type=int, default=5_000,
+                        help="Hard cap per disease when scaling from Synthea (default: 5000)")
     parser.add_argument("--no-synthea", action="store_true",
                         help="Skip Synthea output and generate uniformly per disease")
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
     convert(n_per_disease=args.n_per_disease,
             use_synthea=not args.no_synthea,
+            max_per_disease=args.max_per_disease,
             seed=args.seed)

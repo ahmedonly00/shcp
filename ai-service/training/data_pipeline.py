@@ -27,17 +27,19 @@ DATASETS WITH THIS EXACT SCHEMA
      # Only Training.csv is compatible — Testing.csv lacks the prognosis column
 
 ══════════════════════════════════════════════════════════════════════════════
-DATASETS WITH DIFFERENT SCHEMAS (larger, require mapping — future work)
+DATASETS WITH DIFFERENT SCHEMAS (converted by ddxplus_adapter.py)
 ══════════════════════════════════════════════════════════════════════════════
 
 • DDXPlus (Intelia, 2022) — 1.6 M synthetic patient cases, 49 diseases, 1 230 features
-  Validated by family medicine physicians. Different feature names require a column
-  mapping adapter before merging.
+  Validated by family medicine physicians.  Run the adapter first, then this pipeline
+  auto-discovers the output CSV:
+    python training/ddxplus_adapter.py --source ddxplus
   https://huggingface.co/datasets/Neko-Nik/DDXPlus
 
 • Columbia EHR Dataset (Rotmensch et al., 2017)
   Disease–symptom probability table derived from 270 k de-identified EHR records.
-  Format is a disease×symptom matrix, not patient rows — needs aggregation.
+  The adapter converts the matrix to binary patient rows:
+    python training/ddxplus_adapter.py --source columbia
   https://figshare.com/articles/dataset/Disease_Symptom_and_Patient_Profile_Dataset/
 
 ══════════════════════════════════════════════════════════════════════════════

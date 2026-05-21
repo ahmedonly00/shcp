@@ -7,7 +7,7 @@ import re
 from flask import Blueprint, jsonify, request
 
 from services.symptom_extractor import extract_symptoms
-from services.predictor import predict, MODEL_VERSION
+from services.predictor import predict, MODEL_VERSION, is_model_ready
 from app.extensions import limiter
 from app.services.nlp_service import extract_symptoms as nlp_extract
 from app.services.prediction_logger import log_prediction, prediction_stats
@@ -301,12 +301,14 @@ def health():
             stats:
               type: object
     """
+    ready = is_model_ready()
     return jsonify({
-        "status":             "ok",
+        "status":             "ok" if ready else "degraded",
+        "model_ready":        ready,
         "service":            "SHCP AI Symptom Checker",
         "model_version":      MODEL_VERSION,
         "diseases_supported": 41,
         "symptoms_tracked":   132,
         "languages":          ["en", "fr", "rw"],
         "stats":              prediction_stats(),
-    }), 200
+    }), 200 if ready else 503
