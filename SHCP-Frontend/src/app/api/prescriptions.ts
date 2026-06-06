@@ -10,6 +10,8 @@ export interface MedicationItem {
 
 export interface IssuePrescriptionRequest {
   consultationId?: string;
+  /** Manual pharmacy override — skips auto-routing when set. */
+  pharmacyId?: string;
   patientId: string;
   medications: MedicationItem[];
   instructions?: string;

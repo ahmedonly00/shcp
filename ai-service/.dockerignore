@@ -9,3 +9,5 @@ venv/
 *.log
 .pytest_cache/
 pytest-cache-files-*/
+# Training data — large files only needed locally to regenerate models
+data/

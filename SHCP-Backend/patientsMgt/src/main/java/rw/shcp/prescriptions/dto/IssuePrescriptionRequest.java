@@ -15,6 +15,10 @@ public record IssuePrescriptionRequest(
         @JsonProperty("consultationId")
         UUID consultationId,
 
+        /** Optional: manually pin the prescription to a specific pharmacy, bypassing auto-routing. */
+        @JsonProperty("pharmacyId")
+        UUID pharmacyId,
+
         @JsonProperty("patientId")
         @NotNull UUID patientId,
 

@@ -59,6 +59,8 @@ export const AppointmentScheduling: React.FC<AppointmentSchedulingProps> = ({ on
   const [waitlistEntries, setWaitlistEntries] = useState<WaitlistEntry[]>([]);
   const [joiningWaitlist, setJoiningWaitlist] = useState(false);
   const [hasSymptomReport, setHasSymptomReport] = useState<boolean | null>(null);
+  const [showDetailDialog, setShowDetailDialog] = useState(false);
+  const [detailAppointment, setDetailAppointment] = useState<Appointment | null>(null);
 
   // Load providers and appointments on mount
   useEffect(() => {
@@ -389,14 +391,18 @@ export const AppointmentScheduling: React.FC<AppointmentSchedulingProps> = ({ on
                 ) : (
                   <div className="space-y-3">
                     {appointments.map(apt => (
-                      <div key={apt.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50">
+                      <div
+                        key={apt.id}
+                        className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 cursor-pointer"
+                        onClick={() => { setDetailAppointment(apt); setShowDetailDialog(true); }}
+                      >
                         <div className="flex items-center gap-4">
                           <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center">
                             <User className="h-6 w-6 text-blue-600" />
                           </div>
                           <div>
-                            <h4 className="font-medium">{apt.doctorName}</h4>
-                            <p className="text-sm text-muted-foreground">{apt.doctorSpecialization}</p>
+                            <h4 className="font-medium">{isProvider ? apt.patientName : apt.doctorName}</h4>
+                            <p className="text-sm text-muted-foreground">{isProvider ? 'Patient' : apt.doctorSpecialization}</p>
                             <div className="flex items-center gap-3 mt-1">
                               <span className="text-xs text-muted-foreground">{apt.date} at {apt.time}</span>
                               {(() => {
@@ -420,7 +426,7 @@ export const AppointmentScheduling: React.FC<AppointmentSchedulingProps> = ({ on
                             </div>
                           </div>
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex gap-2" onClick={e => e.stopPropagation()}>
                           {apt.status === 'in-progress' && !isProvider && onJoinConsultation && (
                             <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white"
                               onClick={() => onJoinConsultation(apt)}>
@@ -662,6 +668,63 @@ export const AppointmentScheduling: React.FC<AppointmentSchedulingProps> = ({ on
           </CardContent>
         </Card>
       )}
+
+      {/* Appointment Details Dialog */}
+      <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Appointment Details</DialogTitle>
+          </DialogHeader>
+          {detailAppointment && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <p className="text-muted-foreground">{isProvider ? 'Patient' : 'Doctor'}</p>
+                  <p className="font-medium">{isProvider ? detailAppointment.patientName : detailAppointment.doctorName}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Status</p>
+                  <Badge className="capitalize">{detailAppointment.status}</Badge>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Date</p>
+                  <p className="font-medium">{detailAppointment.date}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Time</p>
+                  <p className="font-medium">{detailAppointment.time}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Type</p>
+                  <p className="font-medium capitalize">{detailAppointment.type}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Duration</p>
+                  <p className="font-medium">{detailAppointment.duration} min</p>
+                </div>
+              </div>
+              {detailAppointment.reason && (
+                <div>
+                  <p className="text-muted-foreground text-sm">Reason</p>
+                  <p className="text-sm mt-1 bg-muted/50 rounded p-2">{detailAppointment.reason}</p>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter className="gap-2">
+            {detailAppointment?.status === 'scheduled' && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => { setShowDetailDialog(false); setSelectedAppointment(detailAppointment); setShowCancelDialog(true); }}
+              >
+                Cancel Appointment
+              </Button>
+            )}
+            <Button variant="outline" size="sm" onClick={() => setShowDetailDialog(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Cancel Dialog */}
       <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>

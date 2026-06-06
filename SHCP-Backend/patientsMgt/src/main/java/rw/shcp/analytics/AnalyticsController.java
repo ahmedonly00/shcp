@@ -15,6 +15,7 @@ import rw.shcp.common.util.SecurityUtils;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/analytics")
@@ -156,6 +157,18 @@ public class AnalyticsController {
     public ResponseEntity<ApiResponse<ProviderStatsDto>> providerStats() {
         return ResponseEntity.ok(ApiResponse.ok(
                 analyticsService.providerStats(SecurityUtils.currentUserId())));
+    }
+
+    @GetMapping("/provider/me/consultations")
+    @PreAuthorize("hasRole('PROVIDER')")
+    @Operation(summary = "Provider's patient consultation list, filterable by date range and status (PROVIDER only)")
+    public ResponseEntity<ApiResponse<List<ConsultationSummaryDto>>> providerConsultationSummary(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(defaultValue = "ALL") String filter) {
+        UUID userId = SecurityUtils.currentUserId();
+        return ResponseEntity.ok(ApiResponse.ok(
+                analyticsService.providerConsultationSummary(userId, from, to, filter)));
     }
 
     // ── Patient endpoint ──────────────────────────────────────────────────────

@@ -22,6 +22,8 @@ services:
         VITE_SIGNALING_URL: ${VITE_SIGNALING_URL:-http://localhost:3001}
         VITE_GOOGLE_FIT_CLIENT_ID: ${VITE_GOOGLE_FIT_CLIENT_ID:-}
     container_name: shcp-frontend
+    environment:
+      PORT: 80
     ports:
       - "80:80"
     depends_on:
@@ -47,7 +49,7 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
       AI_SERVICE_URL: http://ai-service:5000
-      ALLOWED_ORIGINS: ${FRONTEND_URL:-http://localhost}
+      ALLOWED_ORIGINS: ${FRONTEND_URL:-http://localhost},http://localhost,http://localhost:5173
       MAIL_USERNAME: ${MAIL_USERNAME}
       MAIL_PASSWORD: ${MAIL_PASSWORD}
       RABBITMQ_HOST: rabbitmq
@@ -63,6 +65,7 @@ services:
       COTURN_PORT: ${COTURN_PORT:-3478}
       COTURN_TLS_PORT: ${COTURN_TLS_PORT:-5349}
       COTURN_REALM: ${COTURN_REALM:-shcp.rw}
+      SERVER_PORT: 8082
     volumes:
       - ./secrets/fcm-credentials.json:/run/secrets/fcm-credentials.json:ro
     depends_on:
@@ -71,6 +74,8 @@ services:
       rabbitmq:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      ai-service:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8082/actuator/health"]

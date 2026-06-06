@@ -13,8 +13,10 @@ import rw.shcp.common.exception.AppException;
 import rw.shcp.ehr.HealthRecord;
 import rw.shcp.ehr.HealthRecordRepository;
 import rw.shcp.users.dto.*;
+import rw.shcp.users.model.Patient;
 import rw.shcp.users.model.Provider;
 import rw.shcp.users.model.User;
+import rw.shcp.users.repository.PatientRepository;
 import rw.shcp.users.repository.ProviderRepository;
 import rw.shcp.users.repository.UserRepository;
 
@@ -32,6 +34,7 @@ public class ProviderService {
 
     private final ProviderRepository providerRepository;
     private final UserRepository userRepository;
+    private final PatientRepository patientRepository;
     private final AvailabilityRepository availabilityRepository;
     private final AppointmentRepository appointmentRepository;
     private final HealthRecordRepository ehrRepository;
@@ -209,8 +212,22 @@ public class ProviderService {
     }
 
     @PreAuthorize("hasRole('PROVIDER')")
+    public PatientCheckUpSummaryDto getPatientCheckUpSummary(UUID providerId, UUID patientId) {
+        findProviderOrThrow(providerId);
+        if (!appointmentRepository.existsByProviderUserIdAndPatientUserId(providerId, patientId)) {
+            throw AppException.forbidden("You do not have an appointment with this patient");
+        }
+        Patient patient = patientRepository.findById(patientId)
+                .orElseThrow(() -> AppException.notFound("Patient not found"));
+        return PatientCheckUpSummaryDto.from(patient);
+    }
+
+    @PreAuthorize("hasRole('PROVIDER')")
     public HealthRecordDto getPatientEhr(UUID providerId, UUID patientId) {
         findProviderOrThrow(providerId);
+        if (!appointmentRepository.existsByProviderUserIdAndPatientUserId(providerId, patientId)) {
+            throw AppException.forbidden("You do not have an appointment with this patient");
+        }
         return ehrRepository.findByPatientUserId(patientId)
                 .map(HealthRecordDto::from)
                 .orElse(HealthRecordDto.empty(patientId));

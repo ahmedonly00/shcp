@@ -16,4 +16,7 @@ public interface SymptomReportRepository extends JpaRepository<SymptomReport, UU
     Optional<SymptomReport> findByReportIdAndPatientUserId(UUID reportId, UUID patientId);
 
     boolean existsByPatientUserId(UUID patientId);
+
+    /** Most recent symptom report for a patient — used to derive urgency in provider reports. */
+    Optional<SymptomReport> findTopByPatientUserIdOrderByCreatedAtDesc(UUID patientId);
 }

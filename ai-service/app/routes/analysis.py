@@ -302,8 +302,11 @@ def health():
               type: object
     """
     ready = is_model_ready()
+    # Always return HTTP 200 so Docker's health-check (urlopen) succeeds once
+    # the Flask server is up. The model_ready flag tells callers whether
+    # predictions are available without blocking container orchestration.
     return jsonify({
-        "status":             "ok" if ready else "degraded",
+        "status":             "ok" if ready else "starting",
         "model_ready":        ready,
         "service":            "SHCP AI Symptom Checker",
         "model_version":      MODEL_VERSION,
@@ -311,4 +314,4 @@ def health():
         "symptoms_tracked":   132,
         "languages":          ["en", "fr", "rw"],
         "stats":              prediction_stats(),
-    }), 200 if ready else 503
+    }), 200

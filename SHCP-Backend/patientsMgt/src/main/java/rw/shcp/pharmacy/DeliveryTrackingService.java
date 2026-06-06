@@ -20,12 +20,15 @@ public class DeliveryTrackingService {
 
     private final DeliveryRepository deliveryRepository;
 
-    /** Statuses that represent an in-progress delivery the patient can track. */
+    /** Statuses that represent a delivery the patient should be able to see — includes
+     *  terminal failure states so the patient is not left with a silently-vanished card. */
     private static final List<DeliveryStatus> TRACKABLE = List.of(
             DeliveryStatus.ASSIGNED,
             DeliveryStatus.ACCEPTED,
             DeliveryStatus.PICKED_UP,
-            DeliveryStatus.ON_THE_WAY);
+            DeliveryStatus.ON_THE_WAY,
+            DeliveryStatus.FAILED,
+            DeliveryStatus.DECLINED);
 
     // ── Patient: get their current active delivery ─────────────────────────────
 

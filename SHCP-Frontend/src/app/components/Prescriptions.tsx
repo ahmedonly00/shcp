@@ -8,7 +8,7 @@ import { Input } from '@/app/components/ui/input';
 import {
   Pill, Download, Loader2, Search, FileText, Building2,
   Calendar, User, ChevronDown, ChevronUp, XCircle, Bell,
-  RefreshCw, Clock, CheckCircle2, Truck, AlertCircle
+  RefreshCw, Clock, CheckCircle2, Truck, AlertCircle, Navigation
 } from 'lucide-react';
 import { useAuth } from '@/app/context/AuthContext';
 import { prescriptionsApi } from '@/app/api/prescriptions';
@@ -33,7 +33,7 @@ interface Medication {
 const STATUS_META: Record<RxStatus, { label: string; color: string }> = {
   PENDING:              { label: 'Pending',          color: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
   PROCESSING:           { label: 'Processing',       color: 'bg-blue-100 text-blue-800 border-blue-300' },
-  READY_FOR_DELIVERY:   { label: 'Ready',            color: 'bg-indigo-100 text-indigo-800 border-indigo-300' },
+  READY_FOR_DELIVERY:   { label: 'Ready at Pharmacy', color: 'bg-indigo-100 text-indigo-800 border-indigo-300' },
   PICKED_UP:            { label: 'Picked Up',        color: 'bg-cyan-100 text-cyan-800 border-cyan-300' },
   ON_THE_WAY:           { label: 'On the Way',       color: 'bg-purple-100 text-purple-800 border-purple-300' },
   DELIVERED:            { label: 'Delivered',        color: 'bg-green-100 text-green-800 border-green-300' },
@@ -50,8 +50,8 @@ const FILTER_TABS: { key: FilterKey; label: string; icon: React.ReactNode }[] = 
   { key: 'closed',    label: 'Closed',     icon: <XCircle className="h-3.5 w-3.5" /> },
 ];
 
-const ACTIVE_STATUSES:    RxStatus[] = ['PENDING', 'PROCESSING'];
-const TRANSIT_STATUSES:   RxStatus[] = ['READY_FOR_DELIVERY', 'PICKED_UP', 'ON_THE_WAY'];
+const ACTIVE_STATUSES:    RxStatus[] = ['PENDING', 'PROCESSING', 'READY_FOR_DELIVERY'];
+const TRANSIT_STATUSES:   RxStatus[] = ['PICKED_UP', 'ON_THE_WAY'];
 const DELIVERED_STATUSES: RxStatus[] = ['DELIVERED'];
 const CLOSED_STATUSES:    RxStatus[] = ['CANCELLED', 'FAILED', 'EXPIRED'];
 
@@ -79,9 +79,10 @@ interface RxCardProps {
   downloading: boolean;
   cancelling: boolean;
   notifying: boolean;
+  onNavigateToDashboard?: () => void;
 }
 
-function RxCard({ rx, isProvider, onCancel, onNotifyPharmacy, onDownload, downloading, cancelling, notifying }: RxCardProps) {
+function RxCard({ rx, isProvider, onCancel, onNotifyPharmacy, onDownload, downloading, cancelling, notifying, onNavigateToDashboard }: RxCardProps) {
   const [expanded, setExpanded] = useState(false);
   const meds = parseMeds(rx.medications);
   const meta = STATUS_META[rx.status] ?? STATUS_META.PENDING;
@@ -186,6 +187,17 @@ function RxCard({ rx, isProvider, onCancel, onNotifyPharmacy, onDownload, downlo
               Download PDF
             </Button>
 
+            {!isProvider && (rx.status === 'PICKED_UP' || rx.status === 'ON_THE_WAY') && onNavigateToDashboard && (
+              <Button
+                size="sm"
+                className="gap-1.5 bg-cyan-600 hover:bg-cyan-700 text-white"
+                onClick={onNavigateToDashboard}
+              >
+                <Navigation className="h-3.5 w-3.5" />
+                Track Live
+              </Button>
+            )}
+
             {canNotify && (
               <Button
                 size="sm"
@@ -220,7 +232,7 @@ function RxCard({ rx, isProvider, onCancel, onNotifyPharmacy, onDownload, downlo
 
 // ── Main Component ───────────────────────────────────────────────────────────
 
-export function Prescriptions() {
+export function Prescriptions({ onNavigateToDashboard }: { onNavigateToDashboard?: () => void } = {}) {
   const { user } = useAuth();
   const isProvider = user?.role === 'doctor';
 
@@ -415,6 +427,7 @@ export function Prescriptions() {
               downloading={downloadingId === rx.prescriptionId}
               cancelling={cancellingId === rx.prescriptionId}
               notifying={notifyingId === rx.prescriptionId}
+              onNavigateToDashboard={onNavigateToDashboard}
             />
           ))
         )}

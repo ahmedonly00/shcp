@@ -17,7 +17,9 @@ import {
   ResponsiveContainer, Legend
 } from 'recharts';
 import { analyticsApi, DailyCount, ReportData, ScheduledReportConfig } from '@/app/api/analytics';
+import { downloadMohReportPdf, downloadPlatformStatsPdf, downloadAppointmentsPdf, downloadRegistrationsPdf } from '@/app/lib/downloadReportPdf';
 import { ApiPlatformStats } from '@/app/types';
+import { useAuth } from '@/app/context/AuthContext';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
 
@@ -98,6 +100,7 @@ const ALL_METRICS = [
 ];
 
 export const Analytics: React.FC = () => {
+  const { user } = useAuth();
   const [stats, setStats] = useState<ApiPlatformStats | null>(null);
   const { t } = useTranslation();
   const [registrations, setRegistrations] = useState<DailyCount[]>([]);
@@ -105,132 +108,13 @@ export const Analytics: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
 
-  // ── MOH Report Generator state ────────────────────────────────────────────
-  const defaultFrom = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
-  const defaultTo   = new Date().toISOString().slice(0, 10);
-  const [reportFrom, setReportFrom] = useState(defaultFrom);
-  const [reportTo, setReportTo]     = useState(defaultTo);
-  const [selectedMetrics, setSelectedMetrics] = useState<string[]>(ALL_METRICS.map(m => m.key));
-  const [reportData, setReportData] = useState<ReportData | null>(null);
-  const [loadingReport, setLoadingReport] = useState(false);
-  const [exportingReport, setExportingReport] = useState<'csv' | 'xlsx' | null>(null);
-  const [scheduledConfig, setScheduledConfig] = useState<ScheduledReportConfig>({
-    recipientEmails: [],
-    schedule: 'WEEKLY',
-    metrics: ALL_METRICS.map(m => m.key),
-    enabled: false,
-  });
-  const [recipientsInput, setRecipientsInput] = useState('');
-  const [savingConfig, setSavingConfig] = useState(false);
-  const [loadingConfig, setLoadingConfig] = useState(false);
-
-  const toggleMetric = (key: string) =>
-    setSelectedMetrics(prev =>
-      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
-    );
-
-  const handleGenerateReport = async () => {
-    if (!reportFrom || !reportTo) { toast.error('Select a date range'); return; }
-    setLoadingReport(true);
-    setReportData(null);
-    try {
-      const data = await analyticsApi.getMohReport(reportFrom, reportTo, selectedMetrics);
-      setReportData(data);
-    } catch {
-      toast.error('Failed to generate report');
-    } finally {
-      setLoadingReport(false);
-    }
-  };
-
-  const handleExportReport = async (format: 'csv' | 'xlsx' | 'pdf') => {
-    if (!reportFrom || !reportTo) { toast.error('Generate a report first'); return; }
-    if (format === 'pdf') {
-      if (!reportData) { toast.error('Generate a report first'); return; }
-      handlePrintPdf();
-      return;
-    }
-    setExportingReport(format);
-    try {
-      if (format === 'csv') await analyticsApi.exportMohReportCsv(reportFrom, reportTo, selectedMetrics);
-      else await analyticsApi.exportMohReportExcel(reportFrom, reportTo, selectedMetrics);
-    } catch {
-      toast.error('Export failed');
-    } finally {
-      setExportingReport(null);
-    }
-  };
-
-  const handlePrintPdf = () => {
-    if (!reportData) return;
-    const rows = [
-      ['Metric', 'Value'],
-      ...[
-        ['Period', `${reportData.fromDate} to ${reportData.toDate}`],
-        reportData.totalConsultations    != null ? ['Total Consultations',           reportData.totalConsultations]             : null,
-        reportData.completedConsultations!= null ? ['Completed Consultations',        reportData.completedConsultations]         : null,
-        reportData.avgConsultationDurationMinutes != null ? ['Avg Consultation Duration (min)', reportData.avgConsultationDurationMinutes] : null,
-        reportData.totalAppointments     != null ? ['Total Appointments',             reportData.totalAppointments]              : null,
-        reportData.completedAppointments != null ? ['Completed Appointments',         reportData.completedAppointments]          : null,
-        reportData.cancelledAppointments != null ? ['Cancelled Appointments',         reportData.cancelledAppointments]          : null,
-        reportData.newPatients           != null ? ['New Patient Registrations',      reportData.newPatients]                    : null,
-        reportData.newProviders          != null ? ['New Provider Registrations',     reportData.newProviders]                   : null,
-        reportData.totalSymptomReports   != null ? ['Symptom Reports',                reportData.totalSymptomReports]            : null,
-        reportData.totalPrescriptions    != null ? ['Prescriptions Issued',           reportData.totalPrescriptions]             : null,
-        reportData.activePrescriptions   != null ? ['Active Prescriptions',           reportData.activePrescriptions]            : null,
-        reportData.activeProviders       != null ? ['Active Providers',               reportData.activeProviders]                : null,
-        reportData.totalProviders        != null ? ['Total Providers',                reportData.totalProviders]                 : null,
-      ].filter(Boolean) as [string, unknown][],
-    ];
-    const tableRows = rows.map(([k, v]) =>
-      `<tr><td style="padding:6px 12px;border:1px solid #ddd;">${k}</td><td style="padding:6px 12px;border:1px solid #ddd;font-weight:600;">${v}</td></tr>`
-    ).join('');
-    const html = `<!DOCTYPE html><html><head><title>{t("analytics.mohReport")}</title>
-      <style>body{font-family:Arial,sans-serif;padding:32px;}h1{font-size:18px;}table{border-collapse:collapse;width:100%;}th{background:#1d4ed8;color:#fff;padding:8px 12px;}</style>
-      </head><body>
-      <h1>SHCP Ministry of Health Report</h1>
-      <p>Period: <strong>${reportData.fromDate} to ${reportData.toDate}</strong></p>
-      <table><thead><tr><th>Metric</th><th>Value</th></tr></thead><tbody>${tableRows}</tbody></table>
-      <script>window.onload=()=>{window.print();}</script>
-      </body></html>`;
-    const w = window.open('', '_blank');
-    if (w) { w.document.write(html); w.document.close(); }
-  };
-
-  const loadScheduledConfig = async () => {
-    setLoadingConfig(true);
-    try {
-      const cfg = await analyticsApi.getScheduledConfig();
-      setScheduledConfig(cfg);
-      setRecipientsInput(cfg.recipientEmails.join(', '));
-    } catch { /* ignore */ }
-    finally { setLoadingConfig(false); }
-  };
-
-  const handleSaveScheduledConfig = async () => {
-    const emails = recipientsInput.split(/[,\n]+/).map(e => e.trim()).filter(Boolean);
-    setSavingConfig(true);
-    try {
-      const saved = await analyticsApi.saveScheduledConfig({
-        ...scheduledConfig,
-        recipientEmails: emails,
-      });
-      setScheduledConfig(saved);
-      setRecipientsInput(saved.recipientEmails.join(', '));
-      toast.success('Scheduled report configuration saved');
-    } catch {
-      toast.error('Failed to save configuration');
-    } finally {
-      setSavingConfig(false);
-    }
-  };
 
   const handleExport = async (type: 'platform' | 'appointments' | 'registrations') => {
     setExporting(true);
     try {
-      if (type === 'platform') await analyticsApi.exportPlatformCsv();
-      else if (type === 'appointments') await analyticsApi.exportAppointmentsCsv(30);
-      else await analyticsApi.exportRegistrationsCsv(30);
+      if (type === 'platform' && stats)       await downloadPlatformStatsPdf(stats, user?.name ?? 'Administrator');
+      else if (type === 'appointments')       await downloadAppointmentsPdf(appointments, user?.name ?? 'Administrator');
+      else if (type === 'registrations')      await downloadRegistrationsPdf(registrations, user?.name ?? 'Administrator');
     } catch {
       // silent
     } finally {
@@ -251,16 +135,19 @@ export const Analytics: React.FC = () => {
       setLoading(false);
     };
     load();
-    loadScheduledConfig();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const statValue = (n: number | undefined) =>
     loading ? <Skeleton className="h-7 w-14 inline-block align-middle" /> : (n ?? 0).toLocaleString();
 
   const consultationTypePie = [
-    { name: 'Completed', value: stats?.completedAppointments ?? 0, color: '#10b981' },
-    { name: 'Pending', value: stats?.pendingAppointments ?? 0, color: '#f59e0b' },
-  ];
+    { name: 'Completed',   value: stats?.appointments?.completed  ?? 0, color: '#10b981' },
+    { name: 'Confirmed',   value: stats?.appointments?.confirmed  ?? 0, color: '#3b82f6' },
+    { name: 'Pending',     value: stats?.appointments?.pending    ?? 0, color: '#f59e0b' },
+    { name: 'In Progress', value: stats?.appointments?.inProgress ?? 0, color: '#8b5cf6' },
+    { name: 'Cancelled',   value: stats?.appointments?.cancelled  ?? 0, color: '#ef4444' },
+    { name: 'No Show',     value: stats?.appointments?.noShow     ?? 0, color: '#6b7280' },
+  ].filter(d => d.value > 0);
 
   if (loading) return <AnalyticsSkeleton />;
 
@@ -274,13 +161,13 @@ export const Analytics: React.FC = () => {
         <div className="flex gap-2">
           <Button variant="outline" size="sm" disabled={exporting} onClick={() => handleExport('platform')}>
             {exporting ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Download className="h-4 w-4 mr-1" />}
-            {t('analytics.exportStats')}
+            Export Stats PDF
           </Button>
           <Button variant="outline" size="sm" disabled={exporting} onClick={() => handleExport('appointments')}>
-            <Download className="h-4 w-4 mr-1" /> {t('analytics.appointmentsCsv')}
+            <Download className="h-4 w-4 mr-1" /> Appointments PDF
           </Button>
           <Button variant="outline" size="sm" disabled={exporting} onClick={() => handleExport('registrations')}>
-            <Download className="h-4 w-4 mr-1" /> {t('analytics.registrationsCsv')}
+            <Download className="h-4 w-4 mr-1" /> Registrations PDF
           </Button>
         </div>
       </div>
@@ -292,7 +179,7 @@ export const Analytics: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">{t('analytics.totalUsers')}</p>
-                <p className="text-2xl font-bold">{statValue(stats?.totalUsers)}</p>
+                <p className="text-2xl font-bold">{loading ? <Skeleton className="h-7 w-14 inline-block align-middle" /> : ((stats?.totalPatients ?? 0) + (stats?.totalProviders ?? 0) + (stats?.totalAdmins ?? 0)).toLocaleString()}</p>
                 <p className="text-xs text-muted-foreground">{t('analytics.allRegistered')}</p>
               </div>
               <div className="h-12 w-12 bg-blue-100 rounded-full flex items-center justify-center">
@@ -306,9 +193,9 @@ export const Analytics: React.FC = () => {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Active Patients</p>
-                <p className="text-2xl font-bold">{statValue(stats?.activePatients)}</p>
-                <p className="text-xs text-primary">{statValue(stats?.activeProviders)} providers</p>
+                <p className="text-sm text-muted-foreground">Patients</p>
+                <p className="text-2xl font-bold">{statValue(stats?.totalPatients)}</p>
+                <p className="text-xs text-primary">{statValue(stats?.activeProviders)} active providers</p>
               </div>
               <div className="h-12 w-12 bg-green-100 rounded-full flex items-center justify-center">
                 <UserCheck className="h-6 w-6 text-green-600" />
@@ -322,8 +209,8 @@ export const Analytics: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Appointments</p>
-                <p className="text-2xl font-bold">{statValue(stats?.totalAppointments)}</p>
-                <p className="text-xs text-muted-foreground">Total</p>
+                <p className="text-2xl font-bold">{statValue(stats?.appointments?.total)}</p>
+                <p className="text-xs text-muted-foreground">{statValue(stats?.appointments?.completed)} completed</p>
               </div>
               <div className="h-12 w-12 bg-purple-100 rounded-full flex items-center justify-center">
                 <Calendar className="h-6 w-6 text-purple-600" />
@@ -353,7 +240,6 @@ export const Analytics: React.FC = () => {
           <TabsTrigger value="overview">{t('analytics.overview')}</TabsTrigger>
           <TabsTrigger value="consultations">{t('analytics.consultations')}</TabsTrigger>
           <TabsTrigger value="health">{t('analytics.healthTrends')}</TabsTrigger>
-          <TabsTrigger value="moh">{t("analytics.mohReport")}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6 mt-6">
@@ -428,21 +314,21 @@ export const Analytics: React.FC = () => {
             <Card>
               <CardContent className="pt-6 text-center">
                 <p className="text-sm text-muted-foreground mb-1">Total Appointments</p>
-                <p className="text-3xl font-bold">{statValue(stats?.totalAppointments)}</p>
+                <p className="text-3xl font-bold">{statValue(stats?.appointments?.total)}</p>
                 <p className="text-xs text-muted-foreground mt-1">All time</p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="pt-6 text-center">
                 <p className="text-sm text-muted-foreground mb-1">Completed</p>
-                <p className="text-3xl font-bold">{statValue(stats?.completedAppointments)}</p>
+                <p className="text-3xl font-bold">{statValue(stats?.appointments?.completed)}</p>
                 <p className="text-xs text-green-600 mt-1">Successfully done</p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="pt-6 text-center">
                 <p className="text-sm text-muted-foreground mb-1">Pending</p>
-                <p className="text-3xl font-bold">{statValue(stats?.pendingAppointments)}</p>
+                <p className="text-3xl font-bold">{statValue(stats?.appointments?.pending)}</p>
                 <p className="text-xs text-yellow-600 mt-1">Awaiting consultation</p>
               </CardContent>
             </Card>
@@ -510,8 +396,7 @@ export const Analytics: React.FC = () => {
             </Card>
           </div>
         </TabsContent>
-        {/* ── MOH Report Generator ── */}
-        <TabsContent value="moh" className="space-y-6 mt-6">
+        {false && <TabsContent value="moh" className="space-y-6 mt-6">
 
           {/* Date range + metrics selector */}
           <Card>
@@ -522,18 +407,66 @@ export const Analytics: React.FC = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>From Date</Label>
-                  <Input type="date" value={reportFrom}
-                    onChange={e => setReportFrom(e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label>To Date</Label>
-                  <Input type="date" value={reportTo}
-                    onChange={e => setReportTo(e.target.value)} />
+              {/* Quick preset ranges */}
+              <div className="space-y-2">
+                <Label>Quick Range</Label>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { label: 'Today',       days: 0 },
+                    { label: 'Last 7 days', days: 7 },
+                    { label: 'Last 30 days',days: 30 },
+                    { label: 'Last 90 days',days: 90 },
+                    { label: 'This year',   days: -1 },
+                  ].map(({ label, days }) => (
+                    <button
+                      key={label}
+                      type="button"
+                      onClick={() => {
+                        const now = new Date();
+                        const toVal = `${now.toISOString().slice(0, 10)}T23:59`;
+                        let fromVal: string;
+                        if (days === -1) {
+                          fromVal = `${now.getFullYear()}-01-01T00:00`;
+                        } else if (days === 0) {
+                          fromVal = `${now.toISOString().slice(0, 10)}T00:00`;
+                        } else {
+                          fromVal = `${new Date(Date.now() - days * 86400000).toISOString().slice(0, 10)}T00:00`;
+                        }
+                        setReportFrom(fromVal);
+                        setReportTo(toVal);
+                      }}
+                      className="px-3 py-1.5 rounded-full text-xs font-medium border border-border bg-background hover:bg-muted transition-colors"
+                    >
+                      {label}
+                    </button>
+                  ))}
                 </div>
               </div>
+
+              {/* Custom datetime range */}
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>From</Label>
+                  <Input
+                    type="datetime-local"
+                    value={reportFrom}
+                    onChange={e => setReportFrom(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>To</Label>
+                  <Input
+                    type="datetime-local"
+                    value={reportTo}
+                    onChange={e => setReportTo(e.target.value)}
+                  />
+                </div>
+              </div>
+              {fromDate && toDate && fromDate > toDate && (
+                <p className="text-xs text-red-600 flex items-center gap-1">
+                  <AlertCircle className="h-3.5 w-3.5" /> Start date must be before end date
+                </p>
+              )}
 
               <div className="space-y-2">
                 <Label>Metrics to Include</Label>
@@ -589,8 +522,11 @@ export const Analytics: React.FC = () => {
                         Excel
                       </Button>
                       <Button size="sm" variant="outline"
+                        disabled={exportingReport === 'pdf'}
                         onClick={() => handleExportReport('pdf')}>
-                        <Download className="h-4 w-4 mr-1" />
+                        {exportingReport === 'pdf'
+                          ? <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                          : <Download className="h-4 w-4 mr-1" />}
                         PDF
                       </Button>
                     </div>
@@ -603,40 +539,131 @@ export const Analytics: React.FC = () => {
                     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                   </div>
                 ) : reportData ? (
-                  <div className="space-y-4">
-                    <p className="text-sm text-muted-foreground">
-                      Period: <strong>{reportData.fromDate}</strong> → <strong>{reportData.toDate}</strong>
-                    </p>
-                    <table className="w-full text-sm border-collapse">
-                      <thead>
-                        <tr className="bg-primary text-primary-foreground">
-                          <th className="text-left px-4 py-2 font-semibold">Metric</th>
-                          <th className="text-right px-4 py-2 font-semibold">Value</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {[
-                          ['Total Consultations',           reportData.totalConsultations],
-                          ['Completed Consultations',       reportData.completedConsultations],
-                          ['Avg Consultation Duration (min)', reportData.avgConsultationDurationMinutes],
-                          ['Total Appointments',            reportData.totalAppointments],
-                          ['Completed Appointments',        reportData.completedAppointments],
-                          ['Cancelled Appointments',        reportData.cancelledAppointments],
-                          ['New Patient Registrations',     reportData.newPatients],
-                          ['New Provider Registrations',    reportData.newProviders],
-                          ['Symptom Reports',               reportData.totalSymptomReports],
-                          ['Prescriptions Issued',          reportData.totalPrescriptions],
-                          ['Active Prescriptions',          reportData.activePrescriptions],
-                          ['Active Providers',              reportData.activeProviders],
-                          ['Total Providers',               reportData.totalProviders],
-                        ].filter(([, v]) => v != null).map(([label, value], i) => (
-                          <tr key={i} className={i % 2 === 0 ? 'bg-muted/40' : 'bg-background'}>
-                            <td className="px-4 py-2 border-b">{label as string}</td>
-                            <td className="px-4 py-2 border-b text-right font-semibold">{String(value)}</td>
+                  <div className="space-y-6">
+
+                    {/* Report meta — period + generated by */}
+                    <div className="rounded-lg border bg-muted/30 px-4 py-3 space-y-1 text-sm">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-muted-foreground">
+                          Period:{' '}
+                          <strong className="text-foreground">
+                            {new Date(reportFrom).toLocaleString('en-RW', {
+                              day: 'numeric', month: 'long', year: 'numeric',
+                              hour: '2-digit', minute: '2-digit',
+                            })}
+                          </strong>
+                          {' → '}
+                          <strong className="text-foreground">
+                            {new Date(reportTo).toLocaleString('en-RW', {
+                              day: 'numeric', month: 'long', year: 'numeric',
+                              hour: '2-digit', minute: '2-digit',
+                            })}
+                          </strong>
+                        </span>
+                        <span className="text-xs text-muted-foreground italic">
+                          Generated on{' '}
+                          {new Date().toLocaleString('en-RW', {
+                            day: 'numeric', month: 'long', year: 'numeric',
+                            hour: '2-digit', minute: '2-digit',
+                          })}{' '}
+                          by <strong>{user?.name ?? 'Administrator'}</strong>
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Summary metrics table */}
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Summary Metrics</p>
+                      <table className="w-full text-sm border-collapse rounded-lg overflow-hidden">
+                        <thead>
+                          <tr className="bg-primary text-primary-foreground">
+                            <th className="text-left px-4 py-2.5 font-semibold">Metric</th>
+                            <th className="text-right px-4 py-2.5 font-semibold">Value</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {[
+                            ['Total Consultations',             reportData.totalConsultations],
+                            ['Completed Consultations',         reportData.completedConsultations],
+                            ['Avg Consultation Duration (min)', reportData.avgConsultationDurationMinutes],
+                            ['Total Appointments',              reportData.totalAppointments],
+                            ['Completed Appointments',          reportData.completedAppointments],
+                            ['Cancelled Appointments',          reportData.cancelledAppointments],
+                            ['New Patient Registrations',       reportData.newPatients],
+                            ['New Provider Registrations',      reportData.newProviders],
+                            ['Symptom Reports',                 reportData.totalSymptomReports],
+                            ['Prescriptions Issued',            reportData.totalPrescriptions],
+                            ['Active Prescriptions',            reportData.activePrescriptions],
+                            ['Active Providers',                reportData.activeProviders],
+                            ['Total Providers',                 reportData.totalProviders],
+                          ].filter(([, v]) => v != null).map(([label, value], i) => (
+                            <tr key={i} className={i % 2 === 0 ? 'bg-muted/40' : 'bg-background'}>
+                              <td className="px-4 py-2.5 border-b text-foreground">{label as string}</td>
+                              <td className="px-4 py-2.5 border-b text-right font-semibold">
+                                {typeof value === 'number' && !Number.isInteger(value)
+                                  ? (value as number).toFixed(1)
+                                  : String(value)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Daily Appointments breakdown */}
+                    {reportData.dailyAppointments?.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                          Daily Appointments Breakdown ({reportData.dailyAppointments.length} days)
+                        </p>
+                        <div className="max-h-56 overflow-y-auto rounded-lg border">
+                          <table className="w-full text-sm border-collapse">
+                            <thead className="sticky top-0">
+                              <tr className="bg-primary text-primary-foreground">
+                                <th className="text-left px-4 py-2 font-semibold">Date</th>
+                                <th className="text-right px-4 py-2 font-semibold">Appointments</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {reportData.dailyAppointments.map((d, i) => (
+                                <tr key={d.date} className={i % 2 === 0 ? 'bg-muted/40' : 'bg-background'}>
+                                  <td className="px-4 py-2 border-b">{d.date}</td>
+                                  <td className="px-4 py-2 border-b text-right font-semibold">{d.count.toLocaleString()}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Daily Registrations breakdown */}
+                    {reportData.dailyRegistrations?.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                          Daily Registrations Breakdown ({reportData.dailyRegistrations.length} days)
+                        </p>
+                        <div className="max-h-56 overflow-y-auto rounded-lg border">
+                          <table className="w-full text-sm border-collapse">
+                            <thead className="sticky top-0">
+                              <tr className="bg-primary text-primary-foreground">
+                                <th className="text-left px-4 py-2 font-semibold">Date</th>
+                                <th className="text-right px-4 py-2 font-semibold">New Users</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {reportData.dailyRegistrations.map((d, i) => (
+                                <tr key={d.date} className={i % 2 === 0 ? 'bg-muted/40' : 'bg-background'}>
+                                  <td className="px-4 py-2 border-b">{d.date}</td>
+                                  <td className="px-4 py-2 border-b text-right font-semibold">{d.count.toLocaleString()}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
                   </div>
                 ) : null}
               </CardContent>
@@ -745,7 +772,7 @@ export const Analytics: React.FC = () => {
               )}
             </CardContent>
           </Card>
-        </TabsContent>
+        </TabsContent>}
 
 
       </Tabs>

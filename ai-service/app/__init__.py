@@ -1,10 +1,14 @@
 """Flask application factory."""
+import logging
+
 from flask import Flask
 from flask_cors import CORS
 from flasgger import Swagger
 
 from app.extensions import limiter
 from app.routes.analysis import analysis_bp
+
+_log = logging.getLogger(__name__)
 
 _SWAGGER_CONFIG = {
     "headers": [],
@@ -54,5 +58,16 @@ def create_app() -> Flask:
     Swagger(app, config=_SWAGGER_CONFIG, template=_SWAGGER_TEMPLATE)
 
     app.register_blueprint(analysis_bp, url_prefix="")
+
+    # Eagerly load ML models so the /health endpoint reports model_ready=true
+    # immediately after Gunicorn starts (preload_app=True propagates via fork).
+    # Without this, models load lazily on the first /analyze request, which can
+    # take 30–60 s and exceed the Spring Boot RestTemplate read timeout.
+    try:
+        from services.predictor import preload_models
+        preload_models()
+        _log.info("AI models pre-loaded successfully")
+    except Exception as exc:
+        _log.error("Failed to pre-load AI models at startup — service will degrade: %s", exc)
 
     return app

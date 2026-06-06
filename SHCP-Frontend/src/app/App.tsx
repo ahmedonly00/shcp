@@ -55,6 +55,8 @@ import { HealthRecords } from "@/app/components/HealthRecords";
 import { Prescriptions } from "@/app/components/Prescriptions";
 import { Notifications } from "@/app/components/Notifications";
 import { DoctorPortal } from "@/app/components/DoctorPortal";
+import { ProviderReports } from "@/app/components/ProviderReports";
+import { AdminReports } from "@/app/components/AdminReports";
 import { Appointment } from "@/app/types";
 import { Analytics } from "@/app/components/Analytics";
 import { PharmacyManagement } from "@/app/components/PharmacyManagement";
@@ -119,7 +121,9 @@ type View =
   | "messages"
   | "pharmacist-dashboard"
   | "biker-dashboard"
-  | "pharmacies";
+  | "pharmacies"
+  | "provider-reports"
+  | "admin-reports";
 
 const LANGUAGES = [
   { code: 'en', label: 'English', flag: '🇬🇧' },
@@ -227,11 +231,13 @@ const MainApp: React.FC = () => {
   // Restrict views by role
   const canAccess = (view: View): boolean => {
     if (!user) return false;
-    if (view === "analytics" && user.role !== "admin") return false;
-    if (view === "pharmacies" && user.role !== "admin") return false;
-    if (view === "doctor-portal" && user.role !== "doctor") return false;
+    if (view === "analytics"       && user.role !== "admin")       return false;
+    if (view === "admin-reports"   && user.role !== "admin")       return false;
+    if (view === "pharmacies"      && user.role !== "admin")       return false;
+    if (view === "doctor-portal"   && user.role !== "doctor")      return false;
+    if (view === "provider-reports"&& user.role !== "doctor")      return false;
     if (view === "pharmacist-dashboard" && user.role !== "pharmacist") return false;
-    if (view === "biker-dashboard" && user.role !== "biker") return false;
+    if (view === "biker-dashboard" && user.role !== "biker")       return false;
     return true;
   };
 
@@ -249,17 +255,19 @@ const MainApp: React.FC = () => {
   ];
 
   const doctorMenuItems: MenuItem[] = [
-    { id: "doctor-portal" as View, icon: <Stethoscope className="h-5 w-5" />, label: t('nav.doctorPortal') },
-    { id: "appointments" as View, icon: <Calendar className="h-5 w-5" />, label: t('nav.appointments') },
-    { id: "teleconsultation" as View, icon: <Video className="h-5 w-5" />, label: t('nav.consultation') },
-    { id: "prescriptions" as View, icon: <Pill className="h-5 w-5" />, label: 'Prescriptions' },
-    { id: "notifications" as View, icon: <Bell className="h-5 w-5" />, label: t('nav.notifications'), badge: 3 },
+    { id: "doctor-portal"    as View, icon: <Stethoscope className="h-5 w-5" />, label: t('nav.doctorPortal') },
+    { id: "appointments"     as View, icon: <Calendar className="h-5 w-5" />,    label: t('nav.appointments') },
+    { id: "teleconsultation" as View, icon: <Video className="h-5 w-5" />,       label: t('nav.consultation') },
+    { id: "prescriptions"    as View, icon: <Pill className="h-5 w-5" />,        label: 'Prescriptions' },
+    { id: "provider-reports" as View, icon: <FileText className="h-5 w-5" />,   label: 'Reports' },
+    { id: "notifications"    as View, icon: <Bell className="h-5 w-5" />,        label: t('nav.notifications'), badge: 3 },
   ];
 
   const adminMenuItems: MenuItem[] = [
-    { id: "analytics" as View, icon: <BarChart className="h-5 w-5" />, label: t('nav.analytics') },
-    { id: "pharmacies" as View, icon: <Building2 className="h-5 w-5" />, label: "Pharmacies" },
-    { id: "notifications" as View, icon: <Bell className="h-5 w-5" />, label: t('nav.notifications') },
+    { id: "analytics"     as View, icon: <BarChart className="h-5 w-5" />,   label: t('nav.analytics') },
+    { id: "pharmacies"    as View, icon: <Building2 className="h-5 w-5" />,  label: "Pharmacies" },
+    { id: "admin-reports" as View, icon: <FileText className="h-5 w-5" />,   label: 'Reports' },
+    { id: "notifications" as View, icon: <Bell className="h-5 w-5" />,       label: t('nav.notifications') },
   ];
 
   const pharmacistMenuItems: MenuItem[] = [
@@ -334,7 +342,7 @@ const MainApp: React.FC = () => {
       case "health-records":
         return <HealthRecords />;
       case "prescriptions":
-        return <Prescriptions />;
+        return <Prescriptions onNavigateToDashboard={() => setCurrentView('dashboard')} />;
       case "notifications":
         return <Notifications />;
       case "doctor-portal":
@@ -346,8 +354,12 @@ const MainApp: React.FC = () => {
             }}
           />
         );
+      case "provider-reports":
+        return <ProviderReports />;
       case "analytics":
         return <Analytics />;
+      case "admin-reports":
+        return <AdminReports />;
       case "pharmacies":
         return <PharmacyManagement />;
       case "mobile-health":

@@ -9,6 +9,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import rw.shcp.common.enums.PrescriptionStatus;
 import rw.shcp.consultations.Consultation;
+import rw.shcp.pharmacy.Pharmacist;
 import rw.shcp.pharmacy.Pharmacy;
 import rw.shcp.users.model.Patient;
 import rw.shcp.users.model.Provider;
@@ -44,6 +45,10 @@ public class Prescription {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "pharmacy_id")
     private Pharmacy pharmacy;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "dispensed_by")
+    private Pharmacist dispensedBy;
 
     @Column(name = "delivery_address", length = 300)
     private String deliveryAddress;

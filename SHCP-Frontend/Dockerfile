@@ -3,7 +3,6 @@ FROM node:20-alpine AS build
 
 WORKDIR /app
 
-# Enable pnpm via corepack (project uses pnpm-lock.yaml)
 RUN corepack enable
 
 COPY package.json pnpm-lock.yaml ./

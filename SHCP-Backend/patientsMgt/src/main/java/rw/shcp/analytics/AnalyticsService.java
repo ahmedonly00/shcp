@@ -10,7 +10,14 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import rw.shcp.analytics.dto.*;
+import rw.shcp.common.enums.ConsultationStatus;
 import rw.shcp.common.enums.Role;
+import rw.shcp.consultations.Consultation;
+import rw.shcp.consultations.ConsultationRepository;
+import rw.shcp.prescriptions.Prescription;
+import rw.shcp.prescriptions.PrescriptionRepository;
+import rw.shcp.symptoms.SymptomReport;
+import rw.shcp.symptoms.SymptomReportRepository;
 import rw.shcp.users.repository.PatientRepository;
 import rw.shcp.users.repository.UserRepository;
 
@@ -21,6 +28,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -33,6 +41,9 @@ public class AnalyticsService {
         private final UserRepository userRepository;
         private final PatientRepository patientRepository;
         private final MohReportConfigRepository reportConfigRepository;
+        private final ConsultationRepository consultationRepository;
+        private final PrescriptionRepository prescriptionRepository;
+        private final SymptomReportRepository symptomReportRepository;
         private final ObjectMapper objectMapper;
 
         // ── Admin: platform overview ──────────────────────────────────────────────
@@ -129,6 +140,86 @@ public class AnalyticsService {
                                 urgencyBreakdown,
                                 analyticsRepository.countPrescriptionsByPatient(patientId),
                                 analyticsRepository.countActivePrescriptionsByPatient(patientId));
+        }
+
+        // ── Provider: patient consultation summary (for the provider report) ────────
+
+        @PreAuthorize("hasRole('PROVIDER')")
+        public List<ConsultationSummaryDto> providerConsultationSummary(
+                UUID providerId, LocalDate from, LocalDate to, String filter) {
+
+            OffsetDateTime fromDt = from.atStartOfDay().atOffset(ZoneOffset.UTC);
+            OffsetDateTime toDt   = to.plusDays(1).atStartOfDay().atOffset(ZoneOffset.UTC);
+
+            List<Consultation> consultations = consultationRepository
+                    .findByAppointment_Provider_UserIdAndStatusAndCreatedAtBetweenOrderByCreatedAtDesc(
+                            providerId, ConsultationStatus.COMPLETED, fromDt, toDt);
+
+            return consultations.stream()
+                    .map(c -> buildRow(c))
+                    .filter(row -> matchesFilter(row, filter))
+                    .toList();
+        }
+
+        private ConsultationSummaryDto buildRow(Consultation c) {
+            UUID patientId     = c.getAppointment().getPatient().getUserId();
+            String patientName = c.getAppointment().getPatient().getUser().getName();
+
+            // Prescription linked to this consultation
+            List<Prescription> prescriptions = prescriptionRepository
+                    .findByConsultation_ConsultationIdOrderByIssuedAtDesc(c.getConsultationId());
+            Prescription prescription = prescriptions.isEmpty() ? null : prescriptions.get(0);
+            String prescriptionStatus = prescription != null ? prescription.getStatus().name() : null;
+
+            // Fetch the patient's latest symptom report once — used for both diagnosis and urgency
+            SymptomReport latestReport = symptomReportRepository
+                    .findTopByPatientUserIdOrderByCreatedAtDesc(patientId)
+                    .orElse(null);
+
+            // Diagnosis: first medication name → aiPathway from symptom report → consultation notes
+            String diagnosis = null;
+            if (prescription != null) {
+                try {
+                    List<Map<String, Object>> meds = objectMapper.readValue(
+                            prescription.getMedications(), new TypeReference<>() {});
+                    if (!meds.isEmpty()) diagnosis = (String) meds.get(0).get("name");
+                } catch (Exception ignored) {}
+            }
+            if (diagnosis == null && latestReport != null) {
+                diagnosis = latestReport.getAiPathway();
+            }
+            if (diagnosis == null && c.getNotes() != null && !c.getNotes().isBlank()) {
+                diagnosis = c.getNotes().length() > 80
+                        ? c.getNotes().substring(0, 80) + "…"
+                        : c.getNotes();
+            }
+
+            // Urgency from the same report — no second query
+            String urgencyLevel = latestReport != null ? latestReport.getAiUrgency() : "UNKNOWN";
+            if (urgencyLevel == null) urgencyLevel = "UNKNOWN";
+
+            return new ConsultationSummaryDto(
+                    c.getConsultationId(),
+                    patientId,
+                    patientName,
+                    c.getStartedAt(),
+                    c.getDurationMinutes(),
+                    diagnosis,
+                    urgencyLevel,
+                    prescriptionStatus
+            );
+        }
+
+        private boolean matchesFilter(ConsultationSummaryDto row, String filter) {
+            if (filter == null || filter.isBlank() || filter.equalsIgnoreCase("ALL")) return true;
+            return switch (filter.toUpperCase()) {
+                case "CURED"     -> "DELIVERED".equals(row.prescriptionStatus());
+                case "NOT_CURED" -> !"DELIVERED".equals(row.prescriptionStatus());
+                case "SEVERE"    -> "EMERGENCY".equals(row.urgencyLevel());
+                case "MODERATE"  -> "ROUTINE".equals(row.urgencyLevel());
+                case "URGENT"    -> "URGENT".equals(row.urgencyLevel());
+                default          -> true;
+            };
         }
 
         // ── Export ────────────────────────────────────────────────────────────────

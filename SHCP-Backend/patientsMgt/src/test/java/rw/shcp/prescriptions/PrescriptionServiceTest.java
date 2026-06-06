@@ -85,7 +85,7 @@ class PrescriptionServiceTest {
                                 .thenThrow(AppException.notFound("No pharmacy available near delivery address"));
 
                 IssuePrescriptionRequest req = new IssuePrescriptionRequest(
-                                null, patientId,
+                                null, null, patientId,
                                 List.of(new MedicationItem("Amoxicillin", "500mg", "3x/day", 7)),
                                 "Take with food", 30, null,
                                 null, null, null, null, null, null);
@@ -112,7 +112,7 @@ class PrescriptionServiceTest {
                 when(patientRepository.findById(patientId)).thenReturn(Optional.empty());
 
                 IssuePrescriptionRequest req = new IssuePrescriptionRequest(
-                                null, patientId,
+                                null, null, patientId,
                                 List.of(new MedicationItem("Drug", "100mg", "1x/day", 5)),
                                 null, 14, null,
                                 null, null, null, null, null, null);
@@ -138,7 +138,7 @@ class PrescriptionServiceTest {
                 when(consultationRepository.findById(consultationId)).thenReturn(Optional.of(c));
 
                 IssuePrescriptionRequest req = new IssuePrescriptionRequest(
-                                consultationId, patientId,
+                                consultationId, null, patientId,
                                 List.of(new MedicationItem("Drug", "100mg", "1x/day", 5)),
                                 null, 14, null,
                                 null, null, null, null, null, null);

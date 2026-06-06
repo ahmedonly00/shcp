@@ -54,7 +54,7 @@
     "healthRecords": "Health Records",
     "mobileHealth": "Mobile Health",
     "notifications": "Notifications",
-    "doctorPortal": "Doctor Portal",
+    "doctorPortal": "Healthcare Provider Portal",
     "consultation": "Consultation",
     "analytics": "Analytics",
     "settings": "Settings",
@@ -569,7 +569,7 @@
     "recordingSaved": "Recording saved"
   },
   "doctorPortal": {
-    "title": "Doctor Portal",
+    "title": "Healthcare Provider Portal",
     "overview": "Overview",
     "schedule": "Schedule",
     "patients": "Patients",

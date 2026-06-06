@@ -9,7 +9,7 @@ import {
   Video, VideoOff, Mic, MicOff, PhoneOff, MessageSquare,
   FileText, Clock, User, Maximize, Loader2, WifiOff, Calendar as CalendarIcon, Monitor, MonitorOff,
   Circle, Square, Send, Zap, Star, Building2, ChevronLeft, ToggleLeft, ToggleRight,
-  Plus, Trash2, Pill, CheckCircle
+  Plus, Trash2, Pill, CheckCircle, AlertCircle, MapPin
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
@@ -18,6 +18,7 @@ import { patientsApi } from '@/app/api/patients';
 import { providersApi } from '@/app/api/providers';
 import { referralsApi } from '@/app/api/referrals';
 import { prescriptionsApi, MedicationItem } from '@/app/api/prescriptions';
+import { listPharmacies, PharmacyDto } from '@/app/api/pharmacist';
 import { ApiConsultationDto, ApiHealthRecordDto, ApiInstantAvailableProvider, ApiPrescriptionDto, ApiSymptomReport, ApiSymptomReportSummary, Appointment, mapApiAppointment, isAppointmentExpired } from '@/app/types';
 import { useAuth } from '@/app/context/AuthContext';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/app/components/ui/dialog';
@@ -171,6 +172,12 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
   const [rxDistrict, setRxDistrict] = useState('');
   const [rxSector, setRxSector] = useState('');
   const [rxCell, setRxCell] = useState('');
+  const [rxLatitude, setRxLatitude] = useState('');
+  const [rxLongitude, setRxLongitude] = useState('');
+  const [rxPharmacyId, setRxPharmacyId] = useState('');
+  const [rxConflicts, setRxConflicts] = useState<string[]>([]);
+  const [pharmacies, setPharmacies] = useState<PharmacyDto[]>([]);
+  const [loadingPharmacies, setLoadingPharmacies] = useState(false);
   const [issuingRx, setIssuingRx] = useState(false);
   const [issuedRxList, setIssuedRxList] = useState<ApiPrescriptionDto[]>([]);
 
@@ -1199,6 +1206,47 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
     }
   };
 
+  // ─── Prescription safety checks ──────────────────────────────────────────
+
+  const detectConflicts = (meds: MedicationItem[], ehr: typeof ehrSummary): string[] => {
+    if (!ehr) return [];
+    const conflicts: string[] = [];
+    let allergies: { allergen?: string; name?: string }[] = [];
+    let existingMeds: { name?: string }[] = [];
+    try { allergies = JSON.parse(ehr.allergies || '[]'); } catch { /* ignore */ }
+    try { existingMeds = JSON.parse(ehr.medications || '[]'); } catch { /* ignore */ }
+    meds.forEach(med => {
+      const medName = med.name.toLowerCase().trim();
+      if (!medName) return;
+      allergies.forEach(a => {
+        const allergen = (a.allergen || a.name || '').toLowerCase();
+        if (allergen && medName.includes(allergen))
+          conflicts.push(`${med.name} conflicts with known allergy: ${a.allergen || a.name}`);
+      });
+      existingMeds.forEach(m => {
+        if ((m.name || '').toLowerCase() === medName)
+          conflicts.push(`${med.name} is already in the patient's active medications`);
+      });
+    });
+    return conflicts;
+  };
+
+  // Re-run conflict check whenever medications or the loaded EHR change
+  useEffect(() => {
+    const named = rxMedications.filter(m => m.name.trim());
+    setRxConflicts(detectConflicts(named, ehrSummary));
+  }, [rxMedications, ehrSummary]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Load pharmacy list once when the prescription tab is first opened
+  useEffect(() => {
+    if (activeTab !== 'prescription' || !isProvider || pharmacies.length > 0) return;
+    setLoadingPharmacies(true);
+    listPharmacies()
+      .then(list => setPharmacies((list ?? []).filter(p => p.isActive)))
+      .catch(() => { /* silently ignore — override UI simply stays empty */ })
+      .finally(() => setLoadingPharmacies(false));
+  }, [activeTab, isProvider]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ─── Prescription issuance ────────────────────────────────────────────────
 
   const handleIssuePrescription = async () => {
@@ -1212,14 +1260,17 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
     try {
       const rx = await prescriptionsApi.issue({
         consultationId: consultationRef.current?.consultationId,
+        pharmacyId:     rxPharmacyId   || undefined,
         patientId,
         medications: validMeds,
         instructions: rxInstructions || undefined,
         validForDays: rxValidDays,
         providerSignature: user?.name,
-        deliveryDistrict: rxDistrict || undefined,
-        deliverySector:   rxSector   || undefined,
-        deliveryCell:     rxCell     || undefined,
+        deliveryDistrict:  rxDistrict   || undefined,
+        deliverySector:    rxSector     || undefined,
+        deliveryCell:      rxCell       || undefined,
+        deliveryLatitude:  rxLatitude   ? Number(rxLatitude)   : undefined,
+        deliveryLongitude: rxLongitude  ? Number(rxLongitude)  : undefined,
       });
       setIssuedRxList(prev => [rx, ...prev]);
       toast.success(
@@ -1232,6 +1283,9 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
       setRxDistrict('');
       setRxSector('');
       setRxCell('');
+      setRxLatitude('');
+      setRxLongitude('');
+      setRxPharmacyId('');
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } } };
       toast.error(e?.response?.data?.message || 'Failed to issue prescription');
@@ -2466,7 +2520,60 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
                       onChange={e => setRxCell(e.target.value)}
                     />
                   </div>
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <input
+                      className="border rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+                      placeholder="Latitude (e.g. -1.9441)"
+                      value={rxLatitude}
+                      onChange={e => setRxLatitude(e.target.value)}
+                    />
+                    <input
+                      className="border rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+                      placeholder="Longitude (e.g. 30.0619)"
+                      value={rxLongitude}
+                      onChange={e => setRxLongitude(e.target.value)}
+                    />
+                  </div>
                 </div>
+
+                {/* Manual pharmacy override */}
+                <div className="space-y-1.5">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                    <MapPin className="h-3 w-3" /> Pharmacy Override (optional)
+                  </p>
+                  <p className="text-xs text-muted-foreground/70">Leave blank to auto-assign the nearest pharmacy with stock</p>
+                  {loadingPharmacies ? (
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Loader2 className="h-3 w-3 animate-spin" /> Loading pharmacies…
+                    </div>
+                  ) : (
+                    <select
+                      className="w-full border rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary bg-background"
+                      value={rxPharmacyId}
+                      onChange={e => setRxPharmacyId(e.target.value)}
+                    >
+                      <option value="">Auto-assign (recommended)</option>
+                      {pharmacies.map(p => (
+                        <option key={p.pharmacyId} value={p.pharmacyId}>
+                          {p.name}{p.district ? ` — ${p.district}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+
+                {/* Pre-flight conflict warnings */}
+                {rxConflicts.length > 0 && (
+                  <div className="rounded-lg border border-red-200 bg-red-50 p-3 space-y-1.5">
+                    <p className="text-xs font-semibold text-red-800 flex items-center gap-1.5">
+                      <AlertCircle className="h-3.5 w-3.5" /> Potential conflicts detected
+                    </p>
+                    {rxConflicts.map((c, i) => (
+                      <p key={i} className="text-xs text-red-700 pl-5">{c}</p>
+                    ))}
+                    <p className="text-xs text-red-600/80 pl-5 pt-0.5">Review before issuing — the backend will also block known allergy matches.</p>
+                  </div>
+                )}
 
                 <Button
                   className="w-full bg-green-600 hover:bg-green-700 text-white"

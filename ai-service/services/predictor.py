@@ -52,6 +52,11 @@ def is_model_ready() -> bool:
     return _loaded
 
 
+def preload_models() -> None:
+    """Eagerly load all model artefacts at startup so first requests have zero cold-start latency."""
+    _load_models()
+
+
 def _load_models() -> None:
     global _clf, _le, _symptom_columns, _urgency_map, _explainer, _loaded
     if _loaded:
@@ -291,11 +296,15 @@ def predict(
     if confidence < 40.0:
         _entry   = _urgency_map.get(disease_name, {})
         _icd10   = _entry.get("icd10") if isinstance(_entry, dict) else None
+        # Still surface the urgency_map level so the patient gets actionable guidance.
+        # "UNKNOWN" is replaced with the best-guess urgency; the LOW_CONFIDENCE
+        # status already signals that the diagnosis is uncertain.
+        _lc_urgency = _entry.get("urgency", "ROUTINE") if isinstance(_entry, dict) else "ROUTINE"
         return {
             "status":              "LOW_CONFIDENCE",
             "disease":             disease_name,
             "icd10":               _icd10,
-            "urgency":             "UNKNOWN",
+            "urgency":             _lc_urgency,
             "confidence":          confidence,
             "pathway":             None,
             "symptoms":            _to_symptom_dicts(detected_symptoms),

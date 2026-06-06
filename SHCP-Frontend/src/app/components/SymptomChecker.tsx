@@ -14,6 +14,7 @@ import {
   ThumbsUp, ThumbsDown, HelpCircle
 } from 'lucide-react';
 import { symptomsApi, FeedbackInput } from '@/app/api/symptoms';
+import { downloadSymptomAssessmentPdf } from '@/app/lib/downloadReportPdf';
 import { patientsApi } from '@/app/api/patients';
 import { SymptomCheck, ExplainingFactor, mapApiSymptomReport, mapApiSymptomReportSummary } from '@/app/types';
 import { toast } from 'sonner';
@@ -32,72 +33,13 @@ function formatSymptomName(name: string): string {
   return name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
-/** Generate and open a printable HTML report for a symptom assessment. */
-function downloadAssessmentReport(check: SymptomCheck) {
-  const rec = check.aiAssessment.recommendation;
-  const urgencyColor =
-    rec === 'emergency' ? '#dc2626' :
-    rec === 'urgent'    ? '#ea580c' :
-    rec === 'routine'   ? '#ca8a04' : '#16a34a';
-
-  const predictionsHtml = (check.aiAssessment.topPredictions?.length ?? 0) > 0
-    ? `<h3 style="margin:20px 0 8px;font-size:13px;font-weight:600;color:#1e40af">AI Differential Diagnosis</h3>
-       <table style="width:100%;border-collapse:collapse;font-size:12px">
-         <thead><tr style="background:#eff6ff">
-           <th style="padding:5px 8px;text-align:left">Condition</th>
-           <th style="padding:5px 8px;text-align:left">Probability</th>
-         </tr></thead>
-         <tbody>${check.aiAssessment.topPredictions!.map((p, i) => `
-           <tr>
-             <td style="padding:5px 8px;border-bottom:1px solid #e5e7eb;font-weight:${i === 0 ? '600' : 'normal'}">${p.disease}</td>
-             <td style="padding:5px 8px;border-bottom:1px solid #e5e7eb">${Math.round(p.probability)}%</td>
-           </tr>`).join('')}
-         </tbody>
-       </table>`
-    : check.aiAssessment.possibleConditions.length > 0
-      ? `<p><strong>Most likely condition:</strong> ${check.aiAssessment.possibleConditions[0]}</p>`
-      : '';
-
-  const selfCareHtml = (check.aiAssessment.selfCareTips?.length ?? 0) > 0
-    ? `<h3 style="margin:20px 0 6px;font-size:13px;font-weight:600;color:#1e40af">Self-Care Tips</h3>
-       <ul style="margin:0;padding-left:20px;font-size:12px">${check.aiAssessment.selfCareTips!.map(t => `<li style="margin-bottom:3px">${t}</li>`).join('')}</ul>`
-    : '';
-
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
-    <title>AI Symptom Assessment — ${check.date}</title>
-    <style>
-      body{font-family:Arial,sans-serif;margin:32px;color:#111827;font-size:13px}
-      h1{font-size:18px;font-weight:700;margin-bottom:2px}
-      .subtitle{color:#6b7280;font-size:12px;margin-bottom:24px}
-      .badge{display:inline-block;padding:2px 10px;border-radius:9999px;font-size:11px;font-weight:600;text-transform:uppercase}
-      .section-label{font-size:12px;font-weight:600;color:#374151;margin-bottom:4px}
-      .box{background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:10px 14px;font-size:12px;margin-bottom:12px}
-      .disclaimer{margin-top:28px;font-size:10px;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:10px}
-      @media print{button{display:none}}
-    </style>
-  </head><body>
-    <h1>AI Symptom Assessment Report</h1>
-    <p class="subtitle">Generated on ${new Date().toLocaleString()} &nbsp;|&nbsp; Date of assessment: ${check.date}</p>
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px">
-      <span class="badge" style="background:${urgencyColor}20;color:${urgencyColor}">${rec.toUpperCase()}</span>
-      ${check.aiAssessment.icd10 ? `<span style="font-family:monospace;font-size:11px;background:#f3f4f6;border:1px solid #d1d5db;padding:1px 8px;border-radius:4px">ICD-10: ${check.aiAssessment.icd10}</span>` : ''}
-      <span style="font-size:12px;color:#6b7280">Confidence: ${Math.round(check.aiAssessment.confidence)}%</span>
-    </div>
-    <p class="section-label">Reported Symptoms</p>
-    <div class="box">${check.symptoms.map(formatSymptomName).join(', ') || '—'}</div>
-    ${predictionsHtml}
-    <p class="section-label" style="margin-top:16px">Recommendation</p>
-    <div class="box">${check.aiAssessment.details || '—'}
-      ${check.aiAssessment.followUpDays != null ? `<br><em style="color:#6b7280">Follow-up within ${check.aiAssessment.followUpDays} day${check.aiAssessment.followUpDays !== 1 ? 's' : ''}</em>` : ''}
-    </div>
-    ${check.aiAssessment.specialistType ? `<p><strong>Recommended specialist:</strong> ${check.aiAssessment.specialistType}</p>` : ''}
-    ${selfCareHtml}
-    <p class="disclaimer">This AI-generated report is a preliminary screening only — not a medical diagnosis. Always consult a qualified healthcare provider for proper diagnosis and treatment. Confidence: ${Math.round(check.aiAssessment.confidence)}%.</p>
-    <script>window.onload=()=>window.print()<\/script>
-  </body></html>`;
-
-  const win = window.open('', '_blank');
-  if (win) { win.document.write(html); win.document.close(); }
+/** Download a styled PDF report for a symptom assessment. */
+async function downloadAssessmentReport(check: SymptomCheck) {
+  try {
+    await downloadSymptomAssessmentPdf(check);
+  } catch {
+    // fallback: silently ignore
+  }
 }
 
 interface BodyMapProps { onLocationSelect: (l: string) => void; selectedLocations: string[]; }

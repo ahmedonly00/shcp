@@ -1,5 +1,5 @@
 import { apiClient, unwrap, unwrapPage } from './client';
-import { ApiProviderSummary, ApiProviderProfile, ApiSlot, ApiAppointmentDto, ApiHealthRecordDto, ApiInstantAvailableProvider, ApiSymptomReport } from '@/app/types';
+import { ApiProviderSummary, ApiPatientSummary, ApiProviderProfile, ApiSlot, ApiAppointmentDto, ApiHealthRecordDto, ApiInstantAvailableProvider, ApiSymptomReport, ApiPatientCheckUpSummary } from '@/app/types';
 
 export interface UpdateProviderRequest {
   name?: string;
@@ -37,7 +37,10 @@ export const providersApi = {
     apiClient.get('/providers/me/appointments', { params: { page, size } }).then(unwrapPage<ApiAppointmentDto>),
 
   getMyPatients: () =>
-    apiClient.get('/providers/me/patients').then(unwrap<ApiProviderSummary[]>),
+    apiClient.get<ApiPatientSummary[]>('/providers/me/patients').then(unwrap<ApiPatientSummary[]>),
+
+  getPatientCheckUpSummary: (patientId: string) =>
+    apiClient.get<ApiPatientCheckUpSummary>(`/providers/me/patients/${patientId}/checkup-summary`).then(unwrap<ApiPatientCheckUpSummary>),
 
   getPatientEhr: (patientId: string) =>
     apiClient.get<ApiHealthRecordDto>(`/providers/me/patients/${patientId}/ehr`).then(unwrap<ApiHealthRecordDto>),

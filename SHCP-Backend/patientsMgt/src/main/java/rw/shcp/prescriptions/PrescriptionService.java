@@ -20,6 +20,7 @@ import rw.shcp.common.util.RwandaLocations;
 import rw.shcp.notifications.NotificationEvent;
 import rw.shcp.notifications.NotificationPublisher;
 import rw.shcp.pharmacy.Pharmacy;
+import rw.shcp.pharmacy.PharmacyRepository;
 import rw.shcp.pharmacy.PharmacyService;
 import rw.shcp.prescriptions.dto.IssuePrescriptionRequest;
 import rw.shcp.prescriptions.dto.MedicationItem;
@@ -48,6 +49,7 @@ public class PrescriptionService {
     private final PatientRepository       patientRepository;
     private final ProviderRepository      providerRepository;
     private final HealthRecordRepository  healthRecordRepository;
+    private final PharmacyRepository      pharmacyRepository;
     private final PharmacyService         pharmacyService;
     private final NotificationPublisher   notificationPublisher;
     private final ApplicationEventPublisher eventPublisher;
@@ -117,24 +119,34 @@ public class PrescriptionService {
                     req.deliveryDistrict(), providerUserId);
         }
 
-        // ── Gap #1: extract medication names for stock-aware pharmacy selection ─
-        List<String> medNames = req.medications().stream()
-                .map(m -> m.name().toLowerCase())
-                .toList();
-
-        // Auto-assign nearest pharmacy: cell → sector → district → any active
-        // Stock check and Haversine GPS tiebreaker applied at each level.
-        try {
-            Pharmacy nearest = pharmacyService.resolveNearest(
-                    req.deliveryDistrict(), req.deliverySector(), req.deliveryCell(),
-                    req.deliveryLatitude(), req.deliveryLongitude(), medNames);
-            prescription.setPharmacy(nearest);
-            log.info("Prescription auto-assigned to pharmacy={} [{}/{}/{}]",
-                    nearest.getPharmacyId(), nearest.getDistrict(),
-                    nearest.getSector(), nearest.getCell());
-        } catch (AppException e) {
-            log.warn("No pharmacy available for prescription — provider={} patient={}: {}",
-                    providerUserId, req.patientId(), e.getMessage());
+        // ── Pharmacy assignment: manual override or auto-routing ─────────────────
+        if (req.pharmacyId() != null) {
+            // Doctor explicitly chose a pharmacy — bypass auto-routing
+            Pharmacy manual = pharmacyRepository.findById(req.pharmacyId())
+                    .orElseThrow(() -> AppException.notFound("Selected pharmacy not found"));
+            if (!manual.isActive()) {
+                throw AppException.badRequest("The selected pharmacy is not currently active");
+            }
+            prescription.setPharmacy(manual);
+            log.info("Prescription manually assigned to pharmacy={}", manual.getPharmacyId());
+        } else {
+            // Auto-assign nearest pharmacy: cell → sector → district → any active
+            // Stock check and Haversine GPS tiebreaker applied at each level.
+            List<String> medNames = req.medications().stream()
+                    .map(m -> m.name().toLowerCase())
+                    .toList();
+            try {
+                Pharmacy nearest = pharmacyService.resolveNearest(
+                        req.deliveryDistrict(), req.deliverySector(), req.deliveryCell(),
+                        req.deliveryLatitude(), req.deliveryLongitude(), medNames);
+                prescription.setPharmacy(nearest);
+                log.info("Prescription auto-assigned to pharmacy={} [{}/{}/{}]",
+                        nearest.getPharmacyId(), nearest.getDistrict(),
+                        nearest.getSector(), nearest.getCell());
+            } catch (AppException e) {
+                log.warn("No pharmacy available for prescription — provider={} patient={}: {}",
+                        providerUserId, req.patientId(), e.getMessage());
+            }
         }
 
         Prescription saved = prescriptionRepository.save(prescription);

@@ -4,8 +4,11 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import rw.shcp.prescriptions.Prescription;
 import rw.shcp.users.model.User;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -27,4 +30,7 @@ public class Pharmacist {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "pharmacy_id", nullable = false)
     private Pharmacy pharmacy;
+
+    @OneToMany(mappedBy = "dispensedBy", fetch = FetchType.LAZY)
+    private List<Prescription> dispensedPrescriptions = new ArrayList<>();
 }

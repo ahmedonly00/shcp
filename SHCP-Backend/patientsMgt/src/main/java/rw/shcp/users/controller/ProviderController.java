@@ -125,6 +125,15 @@ public class ProviderController {
         return ResponseEntity.ok(ApiResponse.ok(providerService.getMyPatients(userId)));
     }
 
+    @GetMapping("/me/patients/{patientId}/checkup-summary")
+    @PreAuthorize("hasRole('PROVIDER')")
+    @Operation(summary = "Get patient details for check-up report generation (providers only)")
+    public ResponseEntity<ApiResponse<PatientCheckUpSummaryDto>> getPatientCheckUpSummary(
+            @PathVariable UUID patientId) {
+        UUID userId = SecurityUtils.currentUserId();
+        return ResponseEntity.ok(ApiResponse.ok(providerService.getPatientCheckUpSummary(userId, patientId)));
+    }
+
     @GetMapping("/me/patients/{patientId}/ehr")
     @PreAuthorize("hasRole('PROVIDER')")
     @Operation(summary = "Get a patient's electronic health record (providers only)")

@@ -196,6 +196,14 @@ export interface ApiProviderSummary {
   isAvailableForInstant?: boolean;
 }
 
+export interface ApiPatientSummary {
+  patientId: string;
+  name: string;
+  email: string;
+  phone?: string;
+  nationalId?: string;
+}
+
 export interface ApiInstantAvailableProvider {
   providerId: string;
   name: string;
@@ -304,25 +312,59 @@ export interface ApiProviderProfile {
   updatedAt: string;
 }
 
+export interface AppointmentBreakdown {
+  pending: number;
+  confirmed: number;
+  inProgress: number;
+  completed: number;
+  cancelled: number;
+  noShow: number;
+  total: number;
+}
+
+export interface ApiAppointmentBreakdown {
+  pending: number;
+  confirmed: number;
+  inProgress: number;
+  completed: number;
+  cancelled: number;
+  noShow: number;
+  total: number;
+}
+
 export interface ApiPlatformStats {
-  totalUsers: number;
-  activePatients: number;
+  totalPatients: number;
+  totalProviders: number;
+  totalAdmins: number;
   activeProviders: number;
-  totalAppointments: number;
-  completedAppointments: number;
-  pendingAppointments: number;
+  appointments: ApiAppointmentBreakdown;
+  totalConsultations: number;
+  completedConsultations: number;
+  avgConsultationDurationMinutes: number;
   totalSymptomReports: number;
   totalPrescriptions: number;
+  activePrescriptions: number;
 }
 
 export interface ApiProviderStats {
-  providerId: string;
-  totalAppointments: number;
-  completedAppointments: number;
-  totalPatients: number;
-  averageRating: number;
-  totalEarnings: number;
-  appointmentsThisMonth: number;
+  uniquePatients: number;
+  appointments: AppointmentBreakdown;
+  totalConsultations: number;
+  completedConsultations: number;
+  avgConsultationDurationMinutes: number;
+  totalPrescriptionsIssued: number;
+  activePrescriptionsIssued: number;
+}
+
+export interface ProviderConsultationRow {
+  consultationId: string;
+  patientId: string;
+  patientName: string;
+  startedAt: string | null;
+  durationMinutes: number | null;
+  diagnosis: string | null;
+  urgencyLevel: 'EMERGENCY' | 'URGENT' | 'ROUTINE' | 'SELF_CARE' | 'UNKNOWN' | null;
+  prescriptionStatus: string | null;
 }
 
 export interface ApiPatientHealthSummary {
@@ -332,6 +374,21 @@ export interface ApiPatientHealthSummary {
   lastConsultationDate?: string;
   activePrescriptions: number;
   totalSymptomReports: number;
+}
+
+export interface ApiPatientCheckUpSummary {
+  patientId: string;
+  name: string;
+  email: string;
+  phone?: string;
+  dateOfBirth?: string;
+  gender?: string;
+  bloodType?: string;
+  nationalId?: string;
+  insuranceProvider?: string;
+  insuranceNumber?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
 }
 
 export interface ApiHealthRecordDto {
@@ -470,7 +527,7 @@ export function mapApiAppointment(a: ApiAppointmentDto): Appointment {
     time: dt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
     type: fromBackendApptType(a.type),
     status: fromBackendApptStatus(a.status),
-    reason: a.cancellationReason || '',
+    reason: a.notes || a.cancellationReason || '',
     duration: 30,
     fee: a.fee,
     paymentStatus: a.paymentStatus,

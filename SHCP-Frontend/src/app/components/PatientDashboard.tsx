@@ -222,6 +222,8 @@ export const PatientDashboard: React.FC = () => {
 
   const trackingStatuses = new Set(['ASSIGNED', 'ACCEPTED', 'PICKED_UP', 'ON_THE_WAY']);
   const showTracking = activeDelivery != null && trackingStatuses.has(activeDelivery.status);
+  const showFailure = activeDelivery != null && (activeDelivery.status === 'FAILED' || activeDelivery.status === 'DECLINED');
+  const showReadyBanner = !showTracking && !showFailure && rawPrescriptions.some(rx => rx.status === 'READY_FOR_DELIVERY');
 
   if (loading) return <DashboardSkeleton />;
 
@@ -470,6 +472,46 @@ export const PatientDashboard: React.FC = () => {
                 </div>
               ) : null}
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Ready at Pharmacy Banner */}
+      {showReadyBanner && (
+        <Card className="border-2 border-indigo-300 bg-indigo-50/30">
+          <CardContent className="pt-5 pb-5">
+            <div className="flex items-start gap-3">
+              <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
+                <Pill className="h-5 w-5 text-indigo-600" />
+              </div>
+              <div>
+                <p className="font-semibold text-indigo-800">Your medication is ready at the pharmacy</p>
+                <p className="text-sm text-indigo-700 mt-0.5">
+                  The pharmacist has prepared your prescription. A delivery agent will be assigned shortly.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Delivery Failure Notice */}
+      {showFailure && activeDelivery && (
+        <Card className="border-2 border-red-300 bg-red-50/30">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-red-800 text-base">
+              <AlertCircle className="h-5 w-5 text-red-600" />
+              Delivery could not be completed
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-red-700">
+              {activeDelivery.status === 'DECLINED'
+                ? 'The assigned delivery agent declined this order. Your pharmacy is arranging a replacement.'
+                : activeDelivery.failureReason
+                  ? `Reason: ${activeDelivery.failureReason}`
+                  : 'The delivery attempt was unsuccessful. Your pharmacy will arrange a new delivery.'}
+            </p>
           </CardContent>
         </Card>
       )}

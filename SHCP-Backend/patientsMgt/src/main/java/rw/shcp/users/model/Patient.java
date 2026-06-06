@@ -4,8 +4,15 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import rw.shcp.appointments.Appointment;
+import rw.shcp.ehr.HealthRecord;
+import rw.shcp.prescriptions.Prescription;
+import rw.shcp.referrals.Referral;
+import rw.shcp.symptoms.SymptomReport;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -54,4 +61,19 @@ public class Patient {
 
     @Column(name = "insurance_provider", length = 100)
     private String insuranceProvider;
+
+    @OneToOne(mappedBy = "patient", fetch = FetchType.LAZY)
+    private HealthRecord healthRecord;
+
+    @OneToMany(mappedBy = "patient", fetch = FetchType.LAZY)
+    private List<Appointment> appointments = new ArrayList<>();
+
+    @OneToMany(mappedBy = "patient", fetch = FetchType.LAZY)
+    private List<Prescription> prescriptions = new ArrayList<>();
+
+    @OneToMany(mappedBy = "patient", fetch = FetchType.LAZY)
+    private List<Referral> referrals = new ArrayList<>();
+
+    @OneToMany(mappedBy = "patient", fetch = FetchType.LAZY)
+    private List<SymptomReport> symptomReports = new ArrayList<>();
 }

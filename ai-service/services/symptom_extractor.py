@@ -194,6 +194,448 @@ _RAW_SYNONYMS: dict[str, str] = {
     "loss of balance":         "loss_of_balance",
     "unsteady":                "unsteadiness",
 
+    # ── Previously unreachable symptoms (62 model columns now mapped) ─────────
+
+    # nodal_skin_eruptions
+    "skin nodules":            "nodal_skin_eruptions",
+    "nodal eruptions":         "nodal_skin_eruptions",
+    "lumps on skin":           "nodal_skin_eruptions",
+    "skin bumps":              "nodal_skin_eruptions",
+    "raised skin bumps":       "nodal_skin_eruptions",
+
+    # muscle_wasting
+    "muscle wasting":          "muscle_wasting",
+    "muscle loss":             "muscle_wasting",
+    "muscles shrinking":       "muscle_wasting",
+    "muscle atrophy":          "muscle_wasting",
+
+    # cold_hands_and_feets
+    "cold hands and feet":     "cold_hands_and_feets",
+    "cold hands":              "cold_hands_and_feets",
+    "cold feet":               "cold_hands_and_feets",
+    "cold extremities":        "cold_hands_and_feets",
+    "hands and feet cold":     "cold_hands_and_feets",
+
+    # mood_swings
+    "mood swings":             "mood_swings",
+    "mood changes":            "mood_swings",
+    "emotional swings":        "mood_swings",
+    "emotional changes":       "mood_swings",
+
+    # lethargy
+    "lethargy":                "lethargy",
+    "lethargic":               "lethargy",
+    "sluggish":                "lethargy",
+    "no motivation":           "lethargy",
+
+    # patches_in_throat
+    "patches in throat":       "patches_in_throat",
+    "white patches throat":    "patches_in_throat",
+    "throat patches":          "patches_in_throat",
+    "spots in throat":         "patches_in_throat",
+
+    # irregular_sugar_level
+    "irregular sugar level":   "irregular_sugar_level",
+    "blood sugar fluctuation":  "irregular_sugar_level",
+    "sugar level irregular":    "irregular_sugar_level",
+    "fluctuating sugar":        "irregular_sugar_level",
+
+    # sunken_eyes
+    "sunken eyes":             "sunken_eyes",
+    "hollow eyes":             "sunken_eyes",
+    "eyes look hollow":        "sunken_eyes",
+    "deep set eyes":           "sunken_eyes",
+
+    # acute_liver_failure
+    "acute liver failure":     "acute_liver_failure",
+    "liver failure":           "acute_liver_failure",
+    "liver not working":       "acute_liver_failure",
+
+    # fluid_overload / fluid_overload.1
+    "fluid overload":          "fluid_overload",
+    "fluid retention":         "fluid_overload",
+    "fluid buildup":           "fluid_overload",
+    "water retention":         "fluid_overload",
+    "body retaining fluid":    "fluid_overload",
+
+    # swelling_of_stomach
+    "swelling of stomach":     "swelling_of_stomach",
+    "stomach swelling":        "swelling_of_stomach",
+    "swollen stomach":         "swelling_of_stomach",
+    "stomach bloated":         "swelling_of_stomach",
+    "belly swollen":           "swelling_of_stomach",
+
+    # swelled_lymph_nodes
+    "swelled lymph nodes":     "swelled_lymph_nodes",
+    "swollen glands":          "swelled_lymph_nodes",
+    "swollen lymph nodes":     "swelled_lymph_nodes",
+    "lymph nodes swollen":     "swelled_lymph_nodes",
+    "glands swollen":          "swelled_lymph_nodes",
+    "enlarged lymph nodes":    "swelled_lymph_nodes",
+
+    # malaise
+    "malaise":                 "malaise",
+    "general malaise":         "malaise",
+    "feeling unwell":          "malaise",
+    "not feeling well":        "malaise",
+    "generally unwell":        "malaise",
+
+    # sinus_pressure
+    "sinus pressure":          "sinus_pressure",
+    "sinus pain":              "sinus_pressure",
+    "sinus congestion":        "sinus_pressure",
+    "pressure in sinuses":     "sinus_pressure",
+    "face pressure":           "sinus_pressure",
+
+    # irritation_in_anus
+    "irritation in anus":      "irritation_in_anus",
+    "anal irritation":         "irritation_in_anus",
+    "rectal itching":          "irritation_in_anus",
+    "anal itching":            "irritation_in_anus",
+    "itching in anus":         "irritation_in_anus",
+
+    # cramps
+    "cramps":                  "cramps",
+    "muscle cramps":           "cramps",
+    "cramping":                "cramps",
+    "stomach cramps":          "cramps",
+    "leg cramps":              "cramps",
+
+    # swollen_blood_vessels
+    "swollen blood vessels":   "swollen_blood_vessels",
+    "swollen veins":           "swollen_blood_vessels",
+    "varicose veins":          "swollen_blood_vessels",
+    "bulging veins":           "swollen_blood_vessels",
+
+    # puffy_face_and_eyes
+    "puffy face and eyes":     "puffy_face_and_eyes",
+    "puffy face":              "puffy_face_and_eyes",
+    "face puffiness":          "puffy_face_and_eyes",
+    "puffy eyes":              "puffy_face_and_eyes",
+    "facial swelling":         "puffy_face_and_eyes",
+    "swollen face":            "puffy_face_and_eyes",
+
+    # enlarged_thyroid
+    "enlarged thyroid":        "enlarged_thyroid",
+    "thyroid swelling":        "enlarged_thyroid",
+    "goiter":                  "enlarged_thyroid",
+    "goitre":                  "enlarged_thyroid",
+    "swollen thyroid":         "enlarged_thyroid",
+    "neck lump":               "enlarged_thyroid",
+
+    # brittle_nails
+    "brittle nails":           "brittle_nails",
+    "nails brittle":           "brittle_nails",
+    "weak nails":              "brittle_nails",
+    "nails breaking":          "brittle_nails",
+    "nails cracking":          "brittle_nails",
+
+    # extra_marital_contacts
+    "extra marital contacts":  "extra_marital_contacts",
+    "multiple partners":       "extra_marital_contacts",
+    "unprotected sex":         "extra_marital_contacts",
+    "unprotected intercourse": "extra_marital_contacts",
+
+    # drying_and_tingling_lips
+    "drying and tingling lips": "drying_and_tingling_lips",
+    "dry and tingling lips":   "drying_and_tingling_lips",
+    "tingling lips":           "drying_and_tingling_lips",
+    "dry cracked lips":        "drying_and_tingling_lips",
+    "lips tingling":           "drying_and_tingling_lips",
+    "lips dry":                "drying_and_tingling_lips",
+
+    # slurred_speech
+    "slurred speech":          "slurred_speech",
+    "difficulty speaking":     "slurred_speech",
+    "speech slurred":          "slurred_speech",
+    "can't speak clearly":     "slurred_speech",
+    "cannot speak clearly":    "slurred_speech",
+    "talking difficulty":      "slurred_speech",
+
+    # knee_pain
+    "knee pain":               "knee_pain",
+    "knee ache":               "knee_pain",
+    "painful knee":            "knee_pain",
+    "knees hurt":              "knee_pain",
+    "sore knee":               "knee_pain",
+
+    # hip_joint_pain
+    "hip pain":                "hip_joint_pain",
+    "hip joint pain":          "hip_joint_pain",
+    "hip ache":                "hip_joint_pain",
+    "painful hip":             "hip_joint_pain",
+    "hips hurt":               "hip_joint_pain",
+
+    # movement_stiffness
+    "movement stiffness":      "movement_stiffness",
+    "stiff movements":         "movement_stiffness",
+    "stiffness":               "movement_stiffness",
+    "rigid joints":            "movement_stiffness",
+    "difficulty moving":       "movement_stiffness",
+    "hard to move":            "movement_stiffness",
+
+    # spinning_movements
+    "spinning movements":      "spinning_movements",
+    "room spinning":           "spinning_movements",
+    "world spinning":          "spinning_movements",
+    "vertigo":                 "spinning_movements",
+    "spinning sensation":      "spinning_movements",
+
+    # weakness_of_one_body_side
+    "weakness of one side":    "weakness_of_one_body_side",
+    "one sided weakness":      "weakness_of_one_body_side",
+    "half body weak":          "weakness_of_one_body_side",
+    "one side weak":           "weakness_of_one_body_side",
+    "arm weakness one side":   "weakness_of_one_body_side",
+
+    # bladder_discomfort
+    "bladder discomfort":      "bladder_discomfort",
+    "bladder pain":            "bladder_discomfort",
+    "painful bladder":         "bladder_discomfort",
+    "discomfort in bladder":   "bladder_discomfort",
+    "bladder pressure":        "bladder_discomfort",
+
+    # continuous_feel_of_urine
+    "continuous feel of urine": "continuous_feel_of_urine",
+    "constant urge to urinate": "continuous_feel_of_urine",
+    "always feel like urinating": "continuous_feel_of_urine",
+    "urge to urinate":          "continuous_feel_of_urine",
+    "can't stop urinating":     "continuous_feel_of_urine",
+    "feels like urinating":     "continuous_feel_of_urine",
+
+    # passage_of_gases
+    "passage of gases":        "passage_of_gases",
+    "gas passing":             "passage_of_gases",
+    "flatulence":              "passage_of_gases",
+    "intestinal gas":          "passage_of_gases",
+    "bloating":                "passage_of_gases",
+    "passing gas":             "passage_of_gases",
+    "gassy":                   "passage_of_gases",
+
+    # internal_itching
+    "internal itching":        "internal_itching",
+    "itching inside":          "internal_itching",
+    "internal itch":           "internal_itching",
+    "deep itching":            "internal_itching",
+
+    # toxic_look_(typhos)
+    "toxic appearance":        "toxic_look_(typhos)",
+    "very ill looking":        "toxic_look_(typhos)",
+    "severely ill appearance": "toxic_look_(typhos)",
+    "typhoid look":            "toxic_look_(typhos)",
+
+    # irritability
+    "irritability":            "irritability",
+    "irritable":               "irritability",
+    "easily irritated":        "irritability",
+    "short tempered":          "irritability",
+    "easily angered":          "irritability",
+
+    # altered_sensorium (English — Kinyarwanda already covered)
+    "altered sensorium":       "altered_sensorium",
+    "confusion":               "altered_sensorium",
+    "confused":                "altered_sensorium",
+    "disoriented":             "altered_sensorium",
+    "disorientation":          "altered_sensorium",
+    "not knowing where i am":  "altered_sensorium",
+    "mental confusion":        "altered_sensorium",
+
+    # red_spots_over_body
+    "red spots over body":     "red_spots_over_body",
+    "red spots on body":       "red_spots_over_body",
+    "red dots on skin":        "red_spots_over_body",
+    "red spots":               "red_spots_over_body",
+    "red dot rash":            "red_spots_over_body",
+
+    # abnormal_menstruation
+    "abnormal menstruation":   "abnormal_menstruation",
+    "irregular periods":       "abnormal_menstruation",
+    "menstrual irregularity":  "abnormal_menstruation",
+    "abnormal periods":        "abnormal_menstruation",
+    "missed periods":          "abnormal_menstruation",
+    "heavy periods":           "abnormal_menstruation",
+
+    # increased_appetite
+    "increased appetite":      "increased_appetite",
+    "eating more than usual":  "increased_appetite",
+    "appetite increased":      "increased_appetite",
+    "more hungry than usual":  "increased_appetite",
+
+    # mucoid_sputum
+    "mucoid sputum":           "mucoid_sputum",
+    "thick mucus sputum":      "mucoid_sputum",
+    "thick phlegm":            "mucoid_sputum",
+    "green phlegm":            "mucoid_sputum",
+    "cloudy sputum":           "mucoid_sputum",
+
+    # rusty_sputum
+    "rusty sputum":            "rusty_sputum",
+    "rust colored sputum":     "rusty_sputum",
+    "brown sputum":            "rusty_sputum",
+    "rusty phlegm":            "rusty_sputum",
+    "reddish sputum":          "rusty_sputum",
+
+    # lack_of_concentration
+    "lack of concentration":   "lack_of_concentration",
+    "can't concentrate":       "lack_of_concentration",
+    "cannot concentrate":      "lack_of_concentration",
+    "difficulty concentrating": "lack_of_concentration",
+    "poor concentration":      "lack_of_concentration",
+    "brain fog":               "lack_of_concentration",
+    "trouble focusing":        "lack_of_concentration",
+
+    # visual_disturbances
+    "visual disturbances":     "visual_disturbances",
+    "vision problems":         "visual_disturbances",
+    "disturbed vision":        "visual_disturbances",
+    "sight problems":          "visual_disturbances",
+    "seeing things":           "visual_disturbances",
+    "vision disturbance":      "visual_disturbances",
+
+    # receiving_blood_transfusion
+    "blood transfusion":       "receiving_blood_transfusion",
+    "received blood transfusion": "receiving_blood_transfusion",
+    "had blood transfusion":   "receiving_blood_transfusion",
+
+    # receiving_unsterile_injections
+    "unsterile injections":    "receiving_unsterile_injections",
+    "dirty needle":            "receiving_unsterile_injections",
+    "unsterilised injection":  "receiving_unsterile_injections",
+    "unsafe injection":        "receiving_unsterile_injections",
+    "shared needle":           "receiving_unsterile_injections",
+
+    # coma
+    "coma":                    "coma",
+    "unconscious":             "coma",
+    "unresponsive":            "coma",
+    "lost consciousness":      "coma",
+    "not conscious":           "coma",
+
+    # stomach_bleeding
+    "stomach bleeding":        "stomach_bleeding",
+    "gastric bleeding":        "stomach_bleeding",
+    "bleeding stomach":        "stomach_bleeding",
+    "internal stomach bleed":  "stomach_bleeding",
+    "vomiting blood":          "stomach_bleeding",
+
+    # distention_of_abdomen
+    "distention of abdomen":   "distention_of_abdomen",
+    "distended abdomen":       "distention_of_abdomen",
+    "abdominal distension":    "distention_of_abdomen",
+    "abdomen distended":       "distention_of_abdomen",
+    "belly distended":         "distention_of_abdomen",
+
+    # history_of_alcohol_consumption
+    "history of alcohol":      "history_of_alcohol_consumption",
+    "drinks alcohol":          "history_of_alcohol_consumption",
+    "alcohol consumption":     "history_of_alcohol_consumption",
+    "alcoholic":               "history_of_alcohol_consumption",
+    "heavy drinker":           "history_of_alcohol_consumption",
+    "drinks heavily":          "history_of_alcohol_consumption",
+
+    # blood_in_sputum
+    "blood in sputum":         "blood_in_sputum",
+    "coughing blood":          "blood_in_sputum",
+    "blood when coughing":     "blood_in_sputum",
+    "bloody sputum":           "blood_in_sputum",
+    "blood in mucus":          "blood_in_sputum",
+    "haemoptysis":             "blood_in_sputum",
+
+    # prominent_veins_on_calf
+    "prominent veins on calf": "prominent_veins_on_calf",
+    "visible veins calf":      "prominent_veins_on_calf",
+    "bulging calf veins":      "prominent_veins_on_calf",
+    "calf veins visible":      "prominent_veins_on_calf",
+
+    # painful_walking
+    "painful walking":         "painful_walking",
+    "pain when walking":       "painful_walking",
+    "hurts to walk":           "painful_walking",
+    "difficulty walking":      "painful_walking",
+    "walking is painful":      "painful_walking",
+
+    # scurring (skin scaling / flaking artifact from dataset)
+    "scurring":                "scurring",
+    "skin scaling":            "scurring",
+    "skin flaking":            "scurring",
+    "scaly skin":              "scurring",
+    "flaking skin":            "scurring",
+
+    # silver_like_dusting
+    "silver like dusting":     "silver_like_dusting",
+    "silvery skin":            "silver_like_dusting",
+    "silver scales on skin":   "silver_like_dusting",
+    "silver patches":          "silver_like_dusting",
+
+    # small_dents_in_nails
+    "small dents in nails":    "small_dents_in_nails",
+    "nail pitting":            "small_dents_in_nails",
+    "dents in nails":          "small_dents_in_nails",
+    "nail dents":              "small_dents_in_nails",
+    "pitted nails":            "small_dents_in_nails",
+
+    # inflammatory_nails
+    "inflammatory nails":      "inflammatory_nails",
+    "inflamed nails":          "inflammatory_nails",
+    "nail inflammation":       "inflammatory_nails",
+    "swollen nail bed":        "inflammatory_nails",
+
+    # blister
+    "blister":                 "blister",
+    "blisters":                "blister",
+    "skin blisters":           "blister",
+    "fluid filled blisters":   "blister",
+    "water blisters":          "blister",
+
+    # red_sore_around_nose
+    "red sore around nose":    "red_sore_around_nose",
+    "sore around nose":        "red_sore_around_nose",
+    "nose sore":               "red_sore_around_nose",
+    "redness around nose":     "red_sore_around_nose",
+
+    # yellow_crust_ooze
+    "yellow crust ooze":       "yellow_crust_ooze",
+    "yellow discharge":        "yellow_crust_ooze",
+    "yellow crusting":         "yellow_crust_ooze",
+    "yellow ooze":             "yellow_crust_ooze",
+    "crusty yellow skin":      "yellow_crust_ooze",
+
+    # yellow_urine
+    "yellow urine":            "yellow_urine",
+    "bright yellow urine":     "yellow_urine",
+    "very yellow pee":         "yellow_urine",
+    "urine bright yellow":     "yellow_urine",
+
+    # swollen_extremeties (different from swollen_legs)
+    "swollen extremities":     "swollen_extremeties",
+    "swollen hands and feet":  "swollen_extremeties",
+    "extremities swollen":     "swollen_extremeties",
+    "hands and feet swollen":  "swollen_extremeties",
+
+    # Remaining 3 previously unreachable columns
+    "ulcers on tongue":        "ulcers_on_tongue",
+    "tongue ulcers":           "ulcers_on_tongue",
+    "mouth ulcers":            "ulcers_on_tongue",
+    "tongue sores":            "ulcers_on_tongue",
+    "sores on tongue":         "ulcers_on_tongue",
+    "weakness in limbs":       "weakness_in_limbs",
+    "weak limbs":              "weakness_in_limbs",
+    "limb weakness":           "weakness_in_limbs",
+    "arms and legs weak":      "weakness_in_limbs",
+
+    # French — new symptom coverage
+    "crampes":                 "cramps",
+    "ballonnement":            "passage_of_gases",
+    "gaz intestinaux":         "passage_of_gases",
+    "vision trouble":          "visual_disturbances",
+    "vision perturbée":        "visual_disturbances",
+    "ganglions gonflés":       "swelled_lymph_nodes",
+    "vertiges rotatoires":     "spinning_movements",
+    "raideur musculaire":      "movement_stiffness",
+    "crachats rouillés":       "rusty_sputum",
+    "sang dans les crachats":  "blood_in_sputum",
+    "saignement estomac":      "stomach_bleeding",
+
     # French
     "forte fièvre":            "high_fever",
     "douleur thoracique":      "chest_pain",
