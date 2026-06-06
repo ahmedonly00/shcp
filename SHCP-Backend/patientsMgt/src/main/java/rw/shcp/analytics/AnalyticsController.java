@@ -159,6 +159,16 @@ public class AnalyticsController {
                 analyticsService.providerStats(SecurityUtils.currentUserId())));
     }
 
+    @GetMapping("/admin/consultations")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "All completed consultations across all providers in a date range (ADMIN only)")
+    public ResponseEntity<ApiResponse<List<AdminConsultationRowDto>>> adminConsultationSummary(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                analyticsService.adminConsultationSummary(from, to)));
+    }
+
     @GetMapping("/provider/me/consultations")
     @PreAuthorize("hasRole('PROVIDER')")
     @Operation(summary = "Provider's patient consultation list, filterable by date range and status (PROVIDER only)")

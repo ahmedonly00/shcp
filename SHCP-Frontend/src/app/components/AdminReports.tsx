@@ -5,7 +5,7 @@ import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select';
 import { FileText, Download, Loader2, Mail, RefreshCw, AlertCircle } from 'lucide-react';
-import { analyticsApi, ReportData, ScheduledReportConfig } from '@/app/api/analytics';
+import { analyticsApi, ReportData, ScheduledReportConfig, AdminConsultationRow } from '@/app/api/analytics';
 import { downloadMohReportPdf } from '@/app/lib/downloadReportPdf';
 import { useAuth } from '@/app/context/AuthContext';
 import { toast } from 'sonner';
@@ -28,9 +28,10 @@ export const AdminReports: React.FC = () => {
   const [reportFrom,       setReportFrom]       = useState(defaultFrom);
   const [reportTo,         setReportTo]         = useState(defaultTo);
   const [selectedMetrics,  setSelectedMetrics]  = useState<string[]>(ALL_METRICS.map(m => m.key));
-  const [reportData,       setReportData]       = useState<ReportData | null>(null);
-  const [loadingReport,    setLoadingReport]    = useState(false);
-  const [exportingReport,  setExportingReport]  = useState<'csv' | 'xlsx' | 'pdf' | null>(null);
+  const [reportData,        setReportData]        = useState<ReportData | null>(null);
+  const [consultationRows,  setConsultationRows]  = useState<AdminConsultationRow[]>([]);
+  const [loadingReport,     setLoadingReport]     = useState(false);
+  const [exportingReport,   setExportingReport]   = useState<'csv' | 'xlsx' | 'pdf' | null>(null);
 
   const [scheduledConfig,  setScheduledConfig]  = useState<ScheduledReportConfig>({
     recipientEmails: [], schedule: 'WEEKLY', metrics: ALL_METRICS.map(m => m.key), enabled: false,
@@ -58,9 +59,15 @@ export const AdminReports: React.FC = () => {
     if (fromDate > toDate)    { toast.error('Start date must be before end date'); return; }
     setLoadingReport(true);
     setReportData(null);
+    setConsultationRows([]);
     try {
-      const data = await analyticsApi.getMohReport(fromDate, toDate, selectedMetrics);
-      setReportData(data);
+      const [data, rows] = await Promise.allSettled([
+        analyticsApi.getMohReport(fromDate, toDate, selectedMetrics),
+        analyticsApi.adminConsultationSummary(fromDate, toDate),
+      ]);
+      if (data.status === 'fulfilled')  setReportData(data.value);
+      else                              toast.error('Failed to generate report');
+      if (rows.status === 'fulfilled')  setConsultationRows(rows.value ?? []);
     } catch {
       toast.error('Failed to generate report');
     } finally {
@@ -74,7 +81,7 @@ export const AdminReports: React.FC = () => {
     try {
       if (format === 'csv')       await analyticsApi.exportMohReportCsv(fromDate, toDate, selectedMetrics);
       else if (format === 'xlsx') await analyticsApi.exportMohReportExcel(fromDate, toDate, selectedMetrics);
-      else                        await downloadMohReportPdf(reportData, user?.name ?? 'Administrator');
+      else                        await downloadMohReportPdf(reportData, user?.name ?? 'Administrator', consultationRows);
     } catch {
       toast.error('Export failed');
     } finally {
@@ -323,6 +330,64 @@ export const AdminReports: React.FC = () => {
                     </div>
                   </div>
                 )}
+
+                {/* Provider-Patient Consultation Table */}
+                {consultationRows.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                      Provider Consultations — {consultationRows.length} record{consultationRows.length !== 1 ? 's' : ''}
+                    </p>
+                    <div className="overflow-x-auto rounded-lg border max-h-96 overflow-y-auto">
+                      <table className="w-full text-sm border-collapse">
+                        <thead className="sticky top-0">
+                          <tr className="bg-primary text-primary-foreground">
+                            <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">#</th>
+                            <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">Provider</th>
+                            <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">Patient</th>
+                            <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">Diagnosis</th>
+                            <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">Medications</th>
+                            <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">Urgency</th>
+                            <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">Date & Time</th>
+                            <th className="text-right px-3 py-2.5 font-semibold whitespace-nowrap">Duration</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {consultationRows.map((row, i) => {
+                            const urgencyColor =
+                              row.urgencyLevel === 'EMERGENCY' ? 'bg-red-100 text-red-800 border-red-200' :
+                              row.urgencyLevel === 'URGENT'    ? 'bg-orange-100 text-orange-800 border-orange-200' :
+                              row.urgencyLevel === 'ROUTINE'   ? 'bg-yellow-100 text-yellow-800 border-yellow-200' :
+                              row.urgencyLevel === 'SELF_CARE' ? 'bg-green-100 text-green-800 border-green-200' :
+                                                                 'bg-gray-100 text-gray-600 border-gray-200';
+                            return (
+                              <tr key={row.consultationId} className={i % 2 === 0 ? 'bg-muted/30' : 'bg-background'}>
+                                <td className="px-3 py-2 border-b text-muted-foreground">{i + 1}</td>
+                                <td className="px-3 py-2 border-b font-medium whitespace-nowrap">Dr. {row.providerName}</td>
+                                <td className="px-3 py-2 border-b whitespace-nowrap">{row.patientName}</td>
+                                <td className="px-3 py-2 border-b text-muted-foreground max-w-[140px] truncate" title={row.diagnosis ?? ''}>{row.diagnosis ?? '—'}</td>
+                                <td className="px-3 py-2 border-b text-muted-foreground max-w-[160px] truncate" title={row.medications ?? ''}>{row.medications ?? 'None prescribed'}</td>
+                                <td className="px-3 py-2 border-b">
+                                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${urgencyColor}`}>
+                                    {row.urgencyLevel ?? 'UNKNOWN'}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2 border-b text-muted-foreground whitespace-nowrap">
+                                  {row.startedAt
+                                    ? new Date(row.startedAt).toLocaleString('en-RW', { dateStyle: 'medium', timeStyle: 'short' })
+                                    : '—'}
+                                </td>
+                                <td className="px-3 py-2 border-b text-right text-muted-foreground whitespace-nowrap">
+                                  {row.durationMinutes != null ? `${row.durationMinutes} min` : '—'}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
               </div>
             ) : null}
           </CardContent>

@@ -27,6 +27,8 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.Objects;
+import java.util.stream.Collectors;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -220,6 +222,68 @@ public class AnalyticsService {
                 case "URGENT"    -> "URGENT".equals(row.urgencyLevel());
                 default          -> true;
             };
+        }
+
+        // ── Admin: all-provider consultation list for the MOH report ─────────────
+
+        @PreAuthorize("hasRole('ADMIN')")
+        public List<AdminConsultationRowDto> adminConsultationSummary(LocalDate from, LocalDate to) {
+            OffsetDateTime fromDt = from.atStartOfDay().atOffset(ZoneOffset.UTC);
+            OffsetDateTime toDt   = to.plusDays(1).atStartOfDay().atOffset(ZoneOffset.UTC);
+
+            return consultationRepository
+                    .findByStatusAndCreatedAtBetweenOrderByCreatedAtDesc(
+                            ConsultationStatus.COMPLETED, fromDt, toDt)
+                    .stream()
+                    .map(this::buildAdminRow)
+                    .toList();
+        }
+
+        private AdminConsultationRowDto buildAdminRow(Consultation c) {
+            String providerName = c.getAppointment().getProvider().getUser().getName();
+            UUID   patientId    = c.getAppointment().getPatient().getUserId();
+            String patientName  = c.getAppointment().getPatient().getUser().getName();
+
+            List<Prescription> prescriptions = prescriptionRepository
+                    .findByConsultation_ConsultationIdOrderByIssuedAtDesc(c.getConsultationId());
+            Prescription prescription = prescriptions.isEmpty() ? null : prescriptions.get(0);
+            String prescriptionStatus = prescription != null ? prescription.getStatus().name() : null;
+
+            // Full medication list as comma-separated names
+            String medications = null;
+            String diagnosis   = null;
+            if (prescription != null) {
+                try {
+                    List<Map<String, Object>> meds = objectMapper.readValue(
+                            prescription.getMedications(), new TypeReference<>() {});
+                    medications = meds.stream()
+                            .map(m -> (String) m.get("name"))
+                            .filter(Objects::nonNull)
+                            .collect(Collectors.joining(", "));
+                    if (!meds.isEmpty()) diagnosis = (String) meds.get(0).get("name");
+                } catch (Exception ignored) {}
+            }
+
+            // Diagnosis fallback: aiPathway → consultation notes
+            SymptomReport latestReport = symptomReportRepository
+                    .findTopByPatientUserIdOrderByCreatedAtDesc(patientId)
+                    .orElse(null);
+            if (diagnosis == null && latestReport != null) {
+                diagnosis = latestReport.getAiPathway();
+            }
+            if (diagnosis == null && c.getNotes() != null && !c.getNotes().isBlank()) {
+                diagnosis = c.getNotes().length() > 80
+                        ? c.getNotes().substring(0, 80) + "…"
+                        : c.getNotes();
+            }
+
+            String urgencyLevel = latestReport != null ? latestReport.getAiUrgency() : "UNKNOWN";
+            if (urgencyLevel == null) urgencyLevel = "UNKNOWN";
+
+            return new AdminConsultationRowDto(
+                    c.getConsultationId(), providerName, patientId, patientName,
+                    c.getStartedAt(), c.getDurationMinutes(),
+                    diagnosis, medications, urgencyLevel, prescriptionStatus);
         }
 
         // ── Export ────────────────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 import { apiClient, unwrap } from './client';
-import { ApiPlatformStats, ApiProviderStats, ApiPatientHealthSummary, ProviderConsultationRow } from '@/app/types';
-export type { ProviderConsultationRow };
+import { ApiPlatformStats, ApiProviderStats, ApiPatientHealthSummary, ProviderConsultationRow, AdminConsultationRow } from '@/app/types';
+export type { ProviderConsultationRow, AdminConsultationRow };
 
 export interface DailyCount { date: string; count: number; }
 
@@ -59,6 +59,11 @@ export const analyticsApi = {
     apiClient.get<ProviderConsultationRow[]>('/analytics/provider/me/consultations', {
       params: { from, to, filter },
     }).then(unwrap<ProviderConsultationRow[]>),
+
+  adminConsultationSummary: (from: string, to: string) =>
+    apiClient.get<AdminConsultationRow[]>('/analytics/admin/consultations', {
+      params: { from, to },
+    }).then(unwrap<AdminConsultationRow[]>),
 
   patientSummary: () =>
     apiClient.get<ApiPatientHealthSummary>('/analytics/patient/me').then(unwrap<ApiPatientHealthSummary>),

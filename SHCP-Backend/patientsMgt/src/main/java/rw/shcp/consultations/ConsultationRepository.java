@@ -25,6 +25,10 @@ public interface ConsultationRepository extends JpaRepository<Consultation, UUID
     List<Consultation> findByAppointment_Provider_UserIdAndStatusAndCreatedAtBetweenOrderByCreatedAtDesc(
             UUID providerUserId, ConsultationStatus status, OffsetDateTime from, OffsetDateTime to);
 
+    /** All completed consultations across all providers in a date range — for the admin report. */
+    List<Consultation> findByStatusAndCreatedAtBetweenOrderByCreatedAtDesc(
+            ConsultationStatus status, OffsetDateTime from, OffsetDateTime to);
+
     @org.springframework.data.jpa.repository.Query(
         "SELECT c FROM Consultation c " +
         "WHERE c.appointment.provider.userId = :providerId " +

@@ -1,5 +1,5 @@
 import type { ReportData, DailyCount } from '@/app/api/analytics';
-import type { ApiProviderStats, ProviderConsultationRow, ApiPatientCheckUpSummary, ApiHealthRecordDto, ApiSymptomReport, ApiPlatformStats, SymptomCheck } from '@/app/types';
+import type { ApiProviderStats, ProviderConsultationRow, AdminConsultationRow, ApiPatientCheckUpSummary, ApiHealthRecordDto, ApiSymptomReport, ApiPlatformStats, SymptomCheck } from '@/app/types';
 
 // ── Brand palette ─────────────────────────────────────────────────────────────
 const C = {
@@ -97,6 +97,7 @@ function drawPageFooter(
 export async function downloadMohReportPdf(
   data: ReportData,
   generatedBy = 'Administrator',
+  consultations: AdminConsultationRow[] = [],
 ): Promise<void> {
   const { jsPDF }     = await import('jspdf');
   const { autoTable } = await import('jspdf-autotable');
@@ -283,6 +284,58 @@ export async function downloadMohReportPdf(
       bodyStyles: { fontSize: 8.5, textColor: C.gray900, cellPadding: { top: 3, bottom: 3, left: 5, right: 5 } },
       alternateRowStyles: { fillColor: C.gray100 },
       columnStyles: { 1: { halign: 'right', fontStyle: 'bold' } },
+      tableLineColor: C.gray300,
+      tableLineWidth: 0.2,
+      theme: 'grid',
+    });
+  }
+
+  // ── Provider-Patient Consultation Records ──────────────────────────────────
+  if (consultations.length > 0) {
+    doc.addPage(); let cy = 20;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(C.navy);
+    doc.text(`PROVIDER-PATIENT CONSULTATION RECORDS  (${consultations.length} records)`, margin, cy);
+    cy += 3;
+
+    const urgencyLabel = (level: string | null) => {
+      if (!level) return '—';
+      const map: Record<string, string> = { EMERGENCY: 'SEVERE', URGENT: 'URGENT', ROUTINE: 'MODERATE', SELF_CARE: 'SELF-CARE', UNKNOWN: 'UNKNOWN' };
+      return map[level] ?? level;
+    };
+
+    autoTable(doc, {
+      startY: cy,
+      margin: { left: margin, right: margin },
+      head: [['#', 'Provider', 'Patient', 'Diagnosis', 'Medications', 'Urgency', 'Date & Time', 'Duration']],
+      body: consultations.map((row, i) => [
+        String(i + 1),
+        `Dr. ${row.providerName}`,
+        row.patientName,
+        row.diagnosis ?? '—',
+        row.medications ?? 'None prescribed',
+        urgencyLabel(row.urgencyLevel),
+        row.startedAt ? new Date(row.startedAt).toLocaleString('en-RW', { dateStyle: 'short', timeStyle: 'short' }) : '—',
+        row.durationMinutes != null ? `${row.durationMinutes} min` : '—',
+      ]),
+      headStyles: {
+        fillColor: C.navy, textColor: C.white, fontStyle: 'bold', fontSize: 7.5,
+        cellPadding: { top: 3.5, bottom: 3.5, left: 4, right: 4 },
+      },
+      bodyStyles: { fontSize: 7.5, textColor: C.gray900, cellPadding: { top: 3, bottom: 3, left: 4, right: 4 } },
+      alternateRowStyles: { fillColor: C.gray100 },
+      columnStyles: {
+        0: { cellWidth: 8,  halign: 'center' },
+        1: { cellWidth: 28 },
+        2: { cellWidth: 26 },
+        3: { cellWidth: 'auto' },
+        4: { cellWidth: 36 },
+        5: { cellWidth: 18, halign: 'center' },
+        6: { cellWidth: 26, halign: 'center' },
+        7: { cellWidth: 14, halign: 'right' },
+      },
       tableLineColor: C.gray300,
       tableLineWidth: 0.2,
       theme: 'grid',

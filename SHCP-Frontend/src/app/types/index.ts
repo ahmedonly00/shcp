@@ -356,6 +356,19 @@ export interface ApiProviderStats {
   activePrescriptionsIssued: number;
 }
 
+export interface AdminConsultationRow {
+  consultationId: string;
+  providerName: string;
+  patientId: string;
+  patientName: string;
+  startedAt: string | null;
+  durationMinutes: number | null;
+  diagnosis: string | null;
+  medications: string | null;
+  urgencyLevel: string | null;
+  prescriptionStatus: string | null;
+}
+
 export interface ProviderConsultationRow {
   consultationId: string;
   patientId: string;
