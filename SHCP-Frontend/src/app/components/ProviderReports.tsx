@@ -155,6 +155,38 @@ export const ProviderReports: React.FC = () => {
           </div>
 
           <div className="space-y-1.5">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Quick Range</p>
+            <div className="flex flex-wrap gap-2">
+              {([
+                { label: 'Today',        days: 0  },
+                { label: 'Last 7 days',  days: 7  },
+                { label: 'Last 30 days', days: 30 },
+                { label: 'Last 90 days', days: 90 },
+                { label: 'This year',    days: -1 },
+              ] as { label: string; days: number }[]).map(({ label, days }) => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => {
+                    const now = new Date();
+                    const toVal = `${now.toISOString().slice(0, 10)}T23:59`;
+                    const fromVal = days === -1
+                      ? `${now.getFullYear()}-01-01T00:00`
+                      : days === 0
+                        ? `${now.toISOString().slice(0, 10)}T00:00`
+                        : `${new Date(Date.now() - days * 86400000).toISOString().slice(0, 10)}T00:00`;
+                    setReportFrom(fromVal);
+                    setReportTo(toVal);
+                  }}
+                  className="px-3 py-1.5 rounded-full text-xs font-medium border border-border bg-background hover:bg-muted transition-colors"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Filter by Status</p>
             <div className="flex flex-wrap gap-2">
               {[
