@@ -42,6 +42,22 @@ function drawCross(doc: InstanceType<typeof import('jspdf').jsPDF>, x: number, y
   doc.roundedRect(x + arm, y + (size - thick) / 2, size - arm * 2, thick, 1.5, 1.5, 'F');
 }
 
+/** Fetch a public asset and return it as a base64 data URL for jsPDF addImage. */
+async function fetchLogoBase64(url: string): Promise<string | null> {
+  try {
+    const res  = await fetch(url);
+    const blob = await res.blob();
+    return new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload  = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Generates and triggers a browser download for a prescription PDF.
  * jsPDF and jspdf-autotable are dynamically imported so they only load
@@ -52,6 +68,9 @@ export async function downloadPrescriptionPdf(rx: ApiPrescriptionDto): Promise<v
   const { jsPDF } = await import('jspdf');
   const autoTableModule = await import('jspdf-autotable');
   const autoTable = (autoTableModule as unknown as { default: typeof autoTableModule.default }).default ?? autoTableModule.default;
+
+  // Load IVAS logo; falls back to drawn cross if unavailable
+  const ivasLogo = await fetchLogoBase64('/ivas-logo.png');
 
   let meds: MedicationItem[] = [];
   try { meds = JSON.parse(rx.medications); } catch { meds = []; }
@@ -66,17 +85,28 @@ export async function downloadPrescriptionPdf(rx: ApiPrescriptionDto): Promise<v
   doc.setFillColor(C.primary);
   doc.rect(0, 0, pw, 32, 'F');
 
-  // Cross icon
-  drawCross(doc, margin, 7, 18, C.white);
+  // IVAS logo in a white rounded pill (logo has a white bg, so this blends cleanly)
+  const logoW = 30;
+  const logoH = 19;
+  const logoX = margin - 1;
+  const logoY = (32 - logoH) / 2;        // vertically centred in the 32 mm header
+  doc.setFillColor(C.white);
+  doc.roundedRect(logoX - 1, logoY - 1, logoW + 2, logoH + 2, 3, 3, 'F');
+  if (ivasLogo) {
+    doc.addImage(ivasLogo, 'PNG', logoX, logoY, logoW, logoH);
+  } else {
+    drawCross(doc, margin, 7, 18, C.white);
+  }
 
-  // SHCP wordmark
+  // SHCP wordmark — positioned to the right of the logo
+  const textX = logoX + logoW + 5;
   doc.setTextColor(C.white);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(16);
-  doc.text('SHCP', margin + 22, 15);
+  doc.text('SHCP', textX, 15);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
-  doc.text('Smart Health Consultation Platform', margin + 22, 21);
+  doc.text('Smart Health Consultation Platform', textX, 21);
 
   // "MEDICAL PRESCRIPTION" on right
   doc.setFont('helvetica', 'bold');
