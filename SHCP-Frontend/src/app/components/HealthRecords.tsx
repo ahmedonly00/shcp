@@ -121,6 +121,7 @@ export const HealthRecords: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterSection, setFilterSection] = useState<RecordSection | 'all'>('all');
   const [selectedEntry, setSelectedEntry] = useState<ParsedEntry | null>(null);
+  const [ehrDocUrl, setEhrDocUrl] = useState<string | null>(null);
 
   // Upload dialog state
   const [showUpload, setShowUpload] = useState(false);
@@ -148,6 +149,16 @@ export const HealthRecords: React.FC = () => {
       .catch(() => toast.error('Could not load health records'))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    const storedName = selectedEntry?.extra?.storedName;
+    if (!storedName) { setEhrDocUrl(null); return; }
+    let revoked = false;
+    patientsApi.ehrFileUrl(storedName).then(url => {
+      if (!revoked) setEhrDocUrl(url);
+    }).catch(() => setEhrDocUrl(null));
+    return () => { revoked = true; };
+  }, [selectedEntry?.extra?.storedName]);
 
   const filtered = entries.filter(e => {
     const matchSearch = e.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -439,23 +450,30 @@ export const HealthRecords: React.FC = () => {
                 )}
                 {/* File preview for uploaded documents */}
                 {selectedEntry.extra?.fileUrl && selectedEntry.extra?.storedName && (() => {
-                  const fileUrl = patientsApi.ehrFileUrl(selectedEntry.extra!.storedName);
-                  const isImage = /\.(jpg|jpeg|png|gif|webp|bmp|tiff|tif|svg)$/i.test(selectedEntry.extra!.storedName);
-                  const isPdf   = /\.pdf$/i.test(selectedEntry.extra!.storedName);
+                  const storedName = selectedEntry.extra!.storedName;
+                  const isImage = /\.(jpg|jpeg|png|gif|webp|bmp|tiff|tif|svg)$/i.test(storedName);
+                  const isPdf   = /\.pdf$/i.test(storedName);
                   return (
                     <div className="space-y-2">
                       <p className="text-sm font-medium text-muted-foreground">Attached File</p>
-                      {isImage && (
-                        <img src={fileUrl} alt={selectedEntry.title} className="w-full rounded-lg border object-contain max-h-64" />
+                      {!ehrDocUrl && (
+                        <div className="flex items-center justify-center h-16 text-muted-foreground">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        </div>
                       )}
-                      {isPdf && (
-                        <embed src={fileUrl} type="application/pdf" className="w-full h-64 rounded-lg border" />
+                      {ehrDocUrl && isImage && (
+                        <img src={ehrDocUrl} alt={selectedEntry.title} className="w-full rounded-lg border object-contain max-h-64" />
                       )}
-                      <a href={fileUrl} target="_blank" rel="noopener noreferrer" download>
-                        <Button size="sm" variant="outline" className="w-full">
-                          <Download className="h-4 w-4 mr-2" /> Download File
-                        </Button>
-                      </a>
+                      {ehrDocUrl && isPdf && (
+                        <embed src={ehrDocUrl} type="application/pdf" className="w-full h-64 rounded-lg border" />
+                      )}
+                      {ehrDocUrl && (
+                        <a href={ehrDocUrl} target="_blank" rel="noopener noreferrer" download={storedName}>
+                          <Button size="sm" variant="outline" className="w-full">
+                            <Download className="h-4 w-4 mr-2" /> Download File
+                          </Button>
+                        </a>
+                      )}
                     </div>
                   );
                 })()}

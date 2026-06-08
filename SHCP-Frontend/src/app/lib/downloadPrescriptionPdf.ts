@@ -202,7 +202,8 @@ export async function downloadPrescriptionPdf(rx: ApiPrescriptionDto): Promise<v
     theme: 'grid',
   });
 
-  let cursorY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 6;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let cursorY = ((doc as any).lastAutoTable?.finalY ?? (tableY + 30)) + 6;
 
   // ── INSTRUCTIONS ─────────────────────────────────────────────────────────────
   if (rx.instructions) {
@@ -267,7 +268,7 @@ export async function downloadPrescriptionPdf(rx: ApiPrescriptionDto): Promise<v
   doc.text('Smart Health Consultation Platform', margin + 18, footY + 7);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6.5);
-  doc.setTextColor('rgba(255,255,255,0.75)');
+  doc.setTextColor(200, 220, 240);
   doc.text('Endorsed by Ministry of Health Rwanda · Rwanda DPA Compliant', margin + 18, footY + 12);
 
   doc.setTextColor(C.white);

@@ -91,7 +91,7 @@ export const Profile: React.FC = () => {
               insuranceProvider: profile.insuranceProvider || prev.insuranceProvider,
             }));
             if (profile.profilePictureUrl) {
-              setAvatarUrl(patientsApi.avatarUrl(profile.profilePictureUrl));
+              patientsApi.avatarUrl(profile.profilePictureUrl).then(setAvatarUrl).catch(() => {});
             }
           }
           if (ehrData) {
@@ -218,8 +218,11 @@ export const Profile: React.FC = () => {
       const upload = user?.role === 'doctor' ? providersApi.uploadAvatar : patientsApi.uploadAvatar;
       const storedName = await upload(file);
       if (storedName) {
-        const buildUrl = user?.role === 'doctor' ? providersApi.avatarUrl : patientsApi.avatarUrl;
-        setAvatarUrl(buildUrl(storedName));
+        if (user?.role === 'doctor') {
+          setAvatarUrl(providersApi.avatarUrl(storedName));
+        } else {
+          patientsApi.avatarUrl(storedName).then(setAvatarUrl).catch(() => {});
+        }
         toast.success('Profile picture updated');
       }
     } catch {
