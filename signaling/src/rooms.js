@@ -6,7 +6,7 @@
  * Redis key layout:
  *   room:{roomId}:active  HASH  socketId → JSON(peer)   — admitted peers
  *   room:{roomId}:lobby   HASH  socketId → JSON(peer)   — patients waiting to be admitted
- *   socket:{socketId}     STRING JSON({ roomId, inLobby }) — reverse lookup
+ *   socket:{socketId}     STRING JSON({ roomId, inLobby, role }) — reverse lookup
  *
  * All keys carry a 24-hour TTL so orphaned rooms auto-expire.
  *
@@ -75,7 +75,7 @@ async function join(roomId, socketId, userId, role) {
       redis.hset(activeKey(roomId), socketId, peerData),
       redis.expire(activeKey(roomId), TTL_SEC),
       redis.set(socketKey(socketId),
-        JSON.stringify({ roomId, inLobby: false }), "EX", TTL_SEC),
+        JSON.stringify({ roomId, inLobby: false, role }), "EX", TTL_SEC),
     ]);
 
     // Return current active peers (excluding self) and any waiting patients
@@ -95,7 +95,7 @@ async function join(roomId, socketId, userId, role) {
       redis.hset(lobbyKey(roomId), socketId, peerData),
       redis.expire(lobbyKey(roomId), TTL_SEC),
       redis.set(socketKey(socketId),
-        JSON.stringify({ roomId, inLobby: true }), "EX", TTL_SEC),
+        JSON.stringify({ roomId, inLobby: true, role }), "EX", TTL_SEC),
     ]);
 
     return { ok: true, inLobby: true, evictedSocketId };
@@ -103,6 +103,17 @@ async function join(roomId, socketId, userId, role) {
 }
 
 // ── admitPatient ──────────────────────────────────────────────────────────────
+
+/**
+ * Lua script: atomically check active-room capacity and admit the patient.
+ * Returns 1 on success, 0 if the room is already full.
+ */
+const ADMIT_SCRIPT = `
+local count = redis.call('HLEN', KEYS[1])
+if count >= tonumber(ARGV[1]) then return 0 end
+redis.call('HSET', KEYS[1], ARGV[2], ARGV[3])
+return 1
+`;
 
 /**
  * Move a patient from lobby into the active room.
@@ -114,17 +125,20 @@ async function admitPatient(roomId, patientSocketId) {
     return { ok: false, reason: "Patient not found in lobby" };
   }
 
-  const activeCount = await redis.hlen(activeKey(roomId));
-  if (activeCount >= MAX_ACTIVE) {
+  // Atomically check capacity and insert — prevents TOCTOU race
+  const admitted = await redis.eval(
+    ADMIT_SCRIPT, 1, activeKey(roomId), MAX_ACTIVE, patientSocketId, peerData
+  );
+  if (admitted === 0) {
     return { ok: false, reason: "Room is full" };
   }
 
+  const { role: patientRole } = JSON.parse(peerData);
   await Promise.all([
     redis.hdel(lobbyKey(roomId), patientSocketId),
-    redis.hset(activeKey(roomId), patientSocketId, peerData),
     redis.expire(activeKey(roomId), TTL_SEC),
     redis.set(socketKey(patientSocketId),
-      JSON.stringify({ roomId, inLobby: false }), "EX", TTL_SEC),
+      JSON.stringify({ roomId, inLobby: false, role: patientRole }), "EX", TTL_SEC),
   ]);
 
   // Active peers other than the newly admitted patient

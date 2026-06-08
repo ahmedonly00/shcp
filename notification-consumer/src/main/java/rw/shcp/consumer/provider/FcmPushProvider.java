@@ -19,8 +19,7 @@ public class FcmPushProvider implements PushProvider {
     @Override
     public void send(String deviceToken, String title, String body, Map<String, String> data) {
         if (firebaseMessaging == null) {
-            log.warn("FCM not configured — skipping push to token={}", deviceToken);
-            return;
+            throw new NotificationDeliveryException("FCM is not configured — push notification not delivered");
         }
         Message.Builder builder = Message.builder()
                 .setToken(deviceToken)

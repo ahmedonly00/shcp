@@ -117,6 +117,11 @@ function registerHandlers(io, socket) {
 
     if (!info) { socket.emit("error", { message: "You are not in a room" }); return; }
 
+    if (info.role !== "PROVIDER") {
+      socket.emit("error", { message: "Only providers may admit patients" });
+      return;
+    }
+
     let result;
     try {
       result = await rooms.admitPatient(info.roomId, patientSocketId);
@@ -162,6 +167,11 @@ function registerHandlers(io, socket) {
     }
 
     if (!info) return;
+
+    if (info.role !== "PROVIDER") {
+      socket.emit("error", { message: "Only providers may reject patients" });
+      return;
+    }
 
     try {
       await rooms.rejectPatient(info.roomId, patientSocketId);
@@ -212,6 +222,8 @@ function registerHandlers(io, socket) {
 
   // ── leave / disconnect ────────────────────────────────────────────────────────
   async function handleLeave() {
+    if (socket.data?.hasLeft) return;
+
     let result;
     try {
       result = await rooms.leave(socket.id);
@@ -221,6 +233,7 @@ function registerHandlers(io, socket) {
     }
 
     if (!result) return;
+    socket.data.hasLeft = true;
     const { roomId, inLobby } = result;
 
     if (inLobby) {
