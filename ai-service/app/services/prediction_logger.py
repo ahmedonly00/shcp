@@ -1,4 +1,10 @@
-"""Prediction audit log — persists every /analyze result to SQLite."""
+"""Prediction audit log — persists every /analyze result to SQLite.
+
+A module-level singleton connection is opened once at import time and reused
+for every insert and query.  ``check_same_thread=False`` is safe here because
+Flask/Gunicorn routes are single-writer and WAL mode serialises concurrent
+reads at the SQLite layer.
+"""
 from __future__ import annotations
 
 import json
@@ -37,14 +43,22 @@ CREATE TABLE IF NOT EXISTS predictions (
 )
 """
 
+# ── Module-level singleton connection ─────────────────────────────────────────
 
-def _connect() -> sqlite3.Connection:
+_conn: sqlite3.Connection | None = None
+
+
+def _get_conn() -> sqlite3.Connection:
+    """Return the module-level connection, initialising it on first call."""
+    global _conn
+    if _conn is not None:
+        return _conn
     os.makedirs(os.path.dirname(_DB_PATH), exist_ok=True)
-    conn = sqlite3.connect(_DB_PATH, check_same_thread=False)
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute(_DDL)
-    conn.commit()
-    return conn
+    _conn = sqlite3.connect(_DB_PATH, check_same_thread=False)
+    _conn.execute("PRAGMA journal_mode=WAL")
+    _conn.execute(_DDL)
+    _conn.commit()
+    return _conn
 
 
 def log_prediction(
@@ -60,7 +74,7 @@ def log_prediction(
 ) -> None:
     """Write one prediction record. Failures are logged, never raised."""
     try:
-        conn = _connect()
+        conn = _get_conn()
         conn.execute(
             """
             INSERT INTO predictions (
@@ -91,7 +105,6 @@ def log_prediction(
             ),
         )
         conn.commit()
-        conn.close()
     except Exception as exc:
         logger.warning("Prediction logging failed: %s", exc)
 
@@ -99,14 +112,13 @@ def log_prediction(
 def prediction_stats() -> dict:
     """Return aggregate counts from the audit log for the health endpoint."""
     try:
-        conn = _connect()
+        conn = _get_conn()
         cur = conn.execute("SELECT COUNT(*) FROM predictions")
         total = cur.fetchone()[0]
         cur = conn.execute(
             "SELECT urgency, COUNT(*) FROM predictions GROUP BY urgency"
         )
         by_urgency = dict(cur.fetchall())
-        conn.close()
         return {"total_predictions": total, "by_urgency": by_urgency}
     except Exception:
         return {}

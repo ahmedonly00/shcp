@@ -183,10 +183,12 @@ _RAW_SYNONYMS: dict[str, str] = {
     "cannot sleep":            "restlessness",
     "trouble sleeping":        "restlessness",
     "sleep problems":          "restlessness",
-    "ear pain":                "pain_behind_the_eyes",
-    "earache":                 "pain_behind_the_eyes",
-    "ear ache":                "pain_behind_the_eyes",
-    "pain in ear":             "pain_behind_the_eyes",
+    # ear_pain is not a model column; headache is a closer proxy than
+    # pain_behind_the_eyes (which refers to retro-orbital / sinus pain)
+    "ear pain":                "headache",
+    "earache":                 "headache",
+    "ear ache":                "headache",
+    "pain in ear":             "headache",
     "throat pain":             "throat_irritation",
     "painful throat":          "throat_irritation",
     "muscle weakness":         "muscle_weakness",
@@ -760,7 +762,7 @@ _RAW_SYNONYMS: dict[str, str] = {
     "uburibwe bw'imishikaro":  "muscle_pain",
     "kutidindira":             "restlessness",
     "nzoka y'amazuru":         "runny_nose",
-    "kubabara ugutwi":         "pain_behind_the_eyes",  # closest proxy; ear_pain not in model
+    "kubabara ugutwi":         "headache",  # ear_pain not in model; headache is closest proxy
 
     # Systemic
     "kunanirwa":               "fatigue",

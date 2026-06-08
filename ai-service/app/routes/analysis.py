@@ -254,8 +254,10 @@ def _normalise_duration(raw: str) -> str | None:
     if unit in ("hour", "hours"):
         return "less-than-1-day"
     if unit in ("day", "days"):
+        if value == 0:
+            return "less-than-1-day"
         if value <= 3:
-            return "1-3-days" if value >= 1 else "less-than-1-day"
+            return "1-3-days"
         if value <= 7:
             return "3-7-days"
         if value <= 14:
