@@ -1,13 +1,16 @@
 package rw.shcp.symptoms;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 import rw.shcp.common.enums.Role;
@@ -43,10 +46,22 @@ class SymptomServiceTest {
     @Spy  ObjectMapper               objectMapper   = new ObjectMapper().findAndRegisterModules();
     @Spy  ObjectMapper               aiObjectMapper = new ObjectMapper()
             .setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
-            .findAndRegisterModules();
+            .findAndRegisterModules()
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     @Mock RestTemplate               aiRestTemplate;
 
     @InjectMocks SymptomService symptomService;
+
+    /**
+     * Mockito's constructor injection can swap same-type fields when the JVM
+     * does not expose parameter names at runtime for Lombok-generated constructors.
+     * Force the correct mappers into the right fields to be safe.
+     */
+    @BeforeEach
+    void fixMapperInjection() {
+        ReflectionTestUtils.setField(symptomService, "objectMapper",   objectMapper);
+        ReflectionTestUtils.setField(symptomService, "aiObjectMapper", aiObjectMapper);
+    }
 
     // ── analyze_shouldPersistReport_whenAIServiceResponds ─────
 
