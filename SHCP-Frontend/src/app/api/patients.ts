@@ -37,11 +37,15 @@ export const patientsApi = {
     }).then(unwrap<ApiHealthRecordDto>);
   },
 
-  /** Returns a URL with the auth token baked in as a query param for inline display */
-  ehrFileUrl: (storedName: string) => {
-    const token = localStorage.getItem('accessToken') ?? '';
-    return `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8082'}/api/patients/me/ehr/files/${storedName}?token=${token}`;
-  },
+  /**
+   * Fetches an EHR file as a blob via the authenticated API client and returns
+   * a temporary object URL suitable for <img src> or <a href> usage.
+   * The caller is responsible for calling URL.revokeObjectURL() when done.
+   */
+  ehrFileUrl: (storedName: string): Promise<string> =>
+    apiClient
+      .get(`/patients/me/ehr/files/${storedName}`, { responseType: 'blob' })
+      .then(res => URL.createObjectURL(res.data as Blob)),
 
   updateVitals: (vitals: Record<string, string>) =>
     apiClient.patch<ApiHealthRecordDto>('/patients/me/vitals', vitals).then(unwrap<ApiHealthRecordDto>),
@@ -74,10 +78,15 @@ export const patientsApi = {
     }).then(unwrap<string>);
   },
 
-  avatarUrl: (storedName: string) => {
-    const token = localStorage.getItem('accessToken') ?? '';
-    return `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8082'}/api/users/me/files/${storedName}?token=${token}`;
-  },
+  /**
+   * Fetches an avatar file as a blob via the authenticated API client and returns
+   * a temporary object URL suitable for <img src> usage.
+   * The caller is responsible for calling URL.revokeObjectURL() when done.
+   */
+  avatarUrl: (storedName: string): Promise<string> =>
+    apiClient
+      .get(`/users/me/files/${storedName}`, { responseType: 'blob' })
+      .then(res => URL.createObjectURL(res.data as Blob)),
 
   getMySymptomReports: (page = 0, size = 10) =>
     apiClient.get('/patients/me/symptom-reports', { params: { page, size } }).then(unwrapPage<ApiSymptomReportSummary>),
