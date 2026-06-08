@@ -2,6 +2,7 @@ package rw.shcp.config;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -19,30 +20,36 @@ public class AdminDataInitializer implements ApplicationRunner {
     private final UserRepository  userRepository;
     private final PasswordEncoder passwordEncoder;
 
-    /** Default admin credentials — change via env vars in production */
-    private static final String ADMIN_EMAIL    = System.getenv().getOrDefault("ADMIN_EMAIL",    "admin@shcp.rw");
-    private static final String ADMIN_PASSWORD = System.getenv().getOrDefault("ADMIN_PASSWORD", "Admin@1234");
-    private static final String ADMIN_NAME     = System.getenv().getOrDefault("ADMIN_NAME",     "SHCP Administrator");
-    private static final String ADMIN_PHONE    = System.getenv().getOrDefault("ADMIN_PHONE",    "+250780000000");
+    @Value("${admin.initial-email:admin@shcp.rw}")
+    private String adminEmail;
+
+    @Value("${admin.initial-password:Admin@1234}")
+    private String adminPassword;
+
+    @Value("${admin.initial-name:SHCP Administrator}")
+    private String adminName;
+
+    @Value("${admin.initial-phone:+250780000000}")
+    private String adminPhone;
 
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
-        if (userRepository.existsByEmail(ADMIN_EMAIL)) {
+        if (userRepository.existsByEmail(adminEmail)) {
             log.debug("Admin user already exists — skipping seed");
             return;
         }
 
         User admin = new User();
-        admin.setName(ADMIN_NAME);
-        admin.setEmail(ADMIN_EMAIL);
-        admin.setPhone(ADMIN_PHONE);
+        admin.setName(adminName);
+        admin.setEmail(adminEmail);
+        admin.setPhone(adminPhone);
         admin.setRole(Role.ADMIN);
-        admin.setPasswordHash(passwordEncoder.encode(ADMIN_PASSWORD));
+        admin.setPasswordHash(passwordEncoder.encode(adminPassword));
         admin.setLanguagePref("en");
         admin.setVerified(true);  // admin is pre-verified
 
         userRepository.save(admin);
-        log.info("Admin user seeded: {}", ADMIN_EMAIL);
+        log.info("Admin user seeded: {}", adminEmail);
     }
 }

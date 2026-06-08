@@ -5,6 +5,7 @@ import org.springframework.stereotype.Repository;
 import rw.shcp.common.enums.Role;
 import rw.shcp.users.model.User;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -16,4 +17,6 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     boolean existsByEmail(String email);
 
     long countByRole(Role role);
+
+    List<User> findByRole(Role role);
 }

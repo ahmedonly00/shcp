@@ -6,6 +6,8 @@ import com.google.firebase.auth.FirebaseToken;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataAccessException;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.lang.Nullable;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -33,15 +35,18 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class AuthService {
 
-    private static final int  MAX_FAILED_ATTEMPTS = 5;
-    private static final long LOCKOUT_MINUTES     = 30L;
-    private static final long OTP_TTL_SECONDS     = 15 * 60L; // 15 min
+    private static final int  MAX_FAILED_ATTEMPTS  = 5;
+    private static final long LOCKOUT_MINUTES      = 30L;
+    private static final long OTP_TTL_SECONDS      = 15 * 60L; // 15 min
+    private static final int  MAX_OTP_ATTEMPTS     = 5;
+    private static final String OTP_ATTEMPTS_PREFIX = "otp:attempts:";
 
     private static final Duration RATE_WINDOW = Duration.ofMinutes(15);
 
@@ -58,6 +63,7 @@ public class AuthService {
     private final EmailService           emailService;
     private final AuthenticationManager  authManager;
     private final RateLimitStore         rateLimitStore;
+    private final StringRedisTemplate    redisTemplate;
 
     @Autowired(required = false)
     @Nullable
@@ -129,12 +135,15 @@ public class AuthService {
 
     @Transactional
     public String verifyEmail(VerifyEmailRequest req) {
+        checkOtpAttempts(req.email(), "VERIFY");
+
         OtpToken stored = otpTokenRepository.findByEmailAndType(req.email(), "VERIFY")
                 .filter(o -> o.getExpiresAt().isAfter(Instant.now()))
                 .orElseThrow(() -> AppException.badRequest(
                         "Verification code has expired. Please request a new one."));
 
         if (!stored.getCode().equals(req.otp())) {
+            incrementOtpAttempts(req.email(), "VERIFY");
             throw AppException.badRequest("Invalid verification code.");
         }
 
@@ -144,6 +153,7 @@ public class AuthService {
         user.setVerified(true);
         userRepository.save(user);
         otpTokenRepository.deleteByEmailAndType(req.email(), "VERIFY");
+        deleteOtpAttempts(req.email(), "VERIFY");
 
         log.info("Email verified for: {}", req.email());
         return "Email verified successfully. You can now log in.";
@@ -151,6 +161,7 @@ public class AuthService {
 
     // ── Login ─────────────────────────────────────────────────
 
+    @Transactional
     public AuthResponse login(LoginRequest req, String clientIp) {
         checkRateLimit(clientIp);
 
@@ -244,12 +255,15 @@ public class AuthService {
 
     @Transactional
     public String resetPassword(ResetPasswordRequest req) {
+        checkOtpAttempts(req.email(), "RESET");
+
         OtpToken stored = otpTokenRepository.findByEmailAndType(req.email(), "RESET")
                 .filter(o -> o.getExpiresAt().isAfter(Instant.now()))
                 .orElseThrow(() -> AppException.badRequest(
                         "Reset code has expired. Please request a new one."));
 
         if (!stored.getCode().equals(req.otp())) {
+            incrementOtpAttempts(req.email(), "RESET");
             throw AppException.badRequest("Invalid reset code.");
         }
 
@@ -260,6 +274,7 @@ public class AuthService {
         userRepository.save(user);
         otpTokenRepository.deleteByEmailAndType(req.email(), "RESET");
         refreshTokenRepository.deleteByUserId(user.getUserId());
+        deleteOtpAttempts(req.email(), "RESET");
 
         log.info("Password reset for: {}", req.email());
         return "Password reset successful. Please log in with your new password.";
@@ -381,6 +396,42 @@ public class AuthService {
 
     private String generateOtp() {
         return String.format("%06d", new SecureRandom().nextInt(1_000_000));
+    }
+
+    private void checkOtpAttempts(String email, String type) {
+        String key = OTP_ATTEMPTS_PREFIX + type.toLowerCase() + ":" + email;
+        try {
+            String val = redisTemplate.opsForValue().get(key);
+            if (val != null && Long.parseLong(val) >= MAX_OTP_ATTEMPTS) {
+                otpTokenRepository.deleteByEmailAndType(email, type);
+                redisTemplate.delete(key);
+                throw AppException.tooManyRequests("Too many attempts. Request a new code.");
+            }
+        } catch (AppException ex) {
+            throw ex;
+        } catch (DataAccessException e) {
+            log.warn("Redis unavailable — OTP attempt check skipped for email={}", email);
+        }
+    }
+
+    private void incrementOtpAttempts(String email, String type) {
+        String key = OTP_ATTEMPTS_PREFIX + type.toLowerCase() + ":" + email;
+        try {
+            Long count = redisTemplate.opsForValue().increment(key);
+            if (count != null && count == 1L) {
+                redisTemplate.expire(key, OTP_TTL_SECONDS, TimeUnit.SECONDS);
+            }
+        } catch (DataAccessException e) {
+            log.warn("Redis unavailable — OTP attempt increment skipped for email={}", email);
+        }
+    }
+
+    private void deleteOtpAttempts(String email, String type) {
+        try {
+            redisTemplate.delete(OTP_ATTEMPTS_PREFIX + type.toLowerCase() + ":" + email);
+        } catch (DataAccessException e) {
+            log.warn("Redis unavailable — OTP attempt counter deletion skipped for email={}", email);
+        }
     }
 
     private void validateRoleFields(RegisterRequest req) {

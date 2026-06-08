@@ -6,6 +6,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import rw.shcp.common.response.ApiResponse;
 import rw.shcp.pharmacy.dto.AddPharmacistRequest;
@@ -25,18 +26,21 @@ public class PharmacyController {
     private final PharmacyService pharmacyService;
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN','PROVIDER','PATIENT','PHARMACIST','BIKER')")
     @Operation(summary = "List all active pharmacies (public)")
     public ResponseEntity<ApiResponse<List<PharmacyDto>>> listActive() {
         return ResponseEntity.ok(ApiResponse.ok(pharmacyService.listActive()));
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','PROVIDER','PATIENT','PHARMACIST','BIKER')")
     @Operation(summary = "Get pharmacy by ID (public)")
     public ResponseEntity<ApiResponse<PharmacyDto>> getById(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.ok(pharmacyService.getById(id)));
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Create pharmacy (ADMIN only)")
     public ResponseEntity<ApiResponse<PharmacyDto>> create(
             @Valid @RequestBody CreatePharmacyRequest req) {
@@ -45,6 +49,7 @@ public class PharmacyController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Update pharmacy (ADMIN only)")
     public ResponseEntity<ApiResponse<PharmacyDto>> update(
             @PathVariable UUID id,
@@ -53,6 +58,7 @@ public class PharmacyController {
     }
 
     @PatchMapping("/{id}/activate")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Activate pharmacy (ADMIN only)")
     public ResponseEntity<ApiResponse<Void>> activate(@PathVariable UUID id) {
         pharmacyService.setActive(id, true);
@@ -60,6 +66,7 @@ public class PharmacyController {
     }
 
     @PatchMapping("/{id}/deactivate")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Deactivate pharmacy (ADMIN only)")
     public ResponseEntity<ApiResponse<Void>> deactivate(@PathVariable UUID id) {
         pharmacyService.setActive(id, false);
@@ -67,12 +74,14 @@ public class PharmacyController {
     }
 
     @GetMapping("/{id}/pharmacists")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "List pharmacists for a pharmacy (ADMIN only)")
     public ResponseEntity<ApiResponse<List<PharmacistProfileDto>>> listPharmacists(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.ok(pharmacyService.listPharmacists(id)));
     }
 
     @PostMapping("/{id}/pharmacists")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Add a pharmacist to a pharmacy (ADMIN only)")
     public ResponseEntity<ApiResponse<PharmacistProfileDto>> addPharmacist(
             @PathVariable UUID id,

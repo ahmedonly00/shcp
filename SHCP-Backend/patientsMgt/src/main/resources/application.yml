@@ -6,7 +6,7 @@ spring:
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/shcp_db}
     username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:ahmed@2018}
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 20
@@ -38,7 +38,7 @@ spring:
     host: ${MAIL_HOST:smtp.gmail.com}
     port: ${MAIL_PORT:587}
     username: ${MAIL_USERNAME:ahmedndayizeye46@gmail.com}
-    password: ${MAIL_PASSWORD:hlfepyeiszttczas}
+    password: ${MAIL_PASSWORD}
     default-encoding: UTF-8
 
     properties:
@@ -57,7 +57,7 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:ahmed@2018}
+      password: ${REDIS_PASSWORD}
       lettuce:
         pool:
           max-active: 8
@@ -69,7 +69,7 @@ spring:
     host: ${RABBITMQ_HOST:localhost}
     port: ${RABBITMQ_PORT:5672}
     username: ${RABBITMQ_USER:shcp}
-    password: ${RABBITMQ_PASS:ahmed@2018}
+    password: ${RABBITMQ_PASS}
 
   # ── File uploads ──────────────────────────────────────────
   servlet:
@@ -90,7 +90,7 @@ server:
 
 # ── JWT ───────────────────────────────────────────────────────
 jwt:
-  secret: ${JWT_SECRET:6230a4d68c2ed7a6b9c9e752ddbfa172f0d8bcd3cf810aad90b7fdc7a992eee9}
+  secret: ${JWT_SECRET}
   access-token-expiry: 900       # 15 minutes (seconds)
   refresh-token-expiry: 604800   # 7 days (seconds)
 

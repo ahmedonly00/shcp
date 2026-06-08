@@ -90,14 +90,19 @@ public class AuthController {
 
     // ── Helpers ───────────────────────────────────────────────
 
-    /**
-     * Extracts the real client IP, respecting X-Forwarded-For from reverse proxies.
-     */
     private String resolveClientIp(HttpServletRequest request) {
-        String xff = request.getHeader("X-Forwarded-For");
-        if (xff != null && !xff.isEmpty()) {
-            return xff.split(",")[0].trim();
+        String remoteAddr = request.getRemoteAddr();
+        if (isTrustedProxy(remoteAddr)) {
+            String xff = request.getHeader("X-Forwarded-For");
+            if (xff != null && !xff.isEmpty()) {
+                return xff.split(",")[0].trim();
+            }
         }
-        return request.getRemoteAddr();
+        return remoteAddr;
+    }
+
+    private boolean isTrustedProxy(String remoteAddr) {
+        return remoteAddr.equals("127.0.0.1") || remoteAddr.equals("0:0:0:0:0:0:0:1")
+            || remoteAddr.startsWith("10.") || remoteAddr.startsWith("172.") || remoteAddr.startsWith("192.168.");
     }
 }

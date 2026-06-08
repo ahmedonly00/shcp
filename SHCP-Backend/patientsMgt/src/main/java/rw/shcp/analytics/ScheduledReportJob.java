@@ -5,6 +5,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import rw.shcp.auth.EmailService;
 
@@ -52,6 +56,10 @@ public class ScheduledReportJob {
             return;
         }
 
+        SecurityContext ctx = SecurityContextHolder.createEmptyContext();
+        ctx.setAuthentication(new UsernamePasswordAuthenticationToken(
+                "system-scheduler", null, List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))));
+        SecurityContextHolder.setContext(ctx);
         try {
             byte[] csv  = analyticsService.exportReportCsv(from, to, metrics);
             byte[] xlsx = analyticsService.exportReportExcel(from, to, metrics);
@@ -61,6 +69,8 @@ public class ScheduledReportJob {
             configRepository.save(cfg);
         } catch (Exception e) {
             log.error("Failed to send scheduled MOH report: {}", e.getMessage());
+        } finally {
+            SecurityContextHolder.clearContext();
         }
     }
 }

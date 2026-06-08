@@ -135,8 +135,7 @@ public class PrescriptionSlaJob {
                 + " minutes and no alternative pharmacy is available. Manual intervention required.";
         Map<String, Object> meta = Map.of("prescriptionId", p.getPrescriptionId().toString());
 
-        userRepository.findAll().stream()
-                .filter(u -> u.getRole() == Role.ADMIN)
+        userRepository.findByRole(Role.ADMIN)
                 .forEach(admin -> notificationPublisher.publish(
                         NotificationEvent.push(admin.getUserId(), "prescription.sla_alert", msg, meta)));
     }

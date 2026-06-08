@@ -7,6 +7,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import rw.shcp.common.response.ApiResponse;
 import rw.shcp.common.util.SecurityUtils;
@@ -26,6 +27,7 @@ public class DeviceTokenController {
     }
 
     @PutMapping("/device-token")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Register or update the FCM device token for push notifications")
     public ResponseEntity<ApiResponse<Void>> updateDeviceToken(
             @Valid @RequestBody DeviceTokenRequest req) {
@@ -38,6 +40,7 @@ public class DeviceTokenController {
     }
 
     @DeleteMapping("/device-token")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Deregister the FCM device token (e.g. on logout)")
     public ResponseEntity<ApiResponse<Void>> removeDeviceToken() {
         User user = SecurityUtils.currentUser();

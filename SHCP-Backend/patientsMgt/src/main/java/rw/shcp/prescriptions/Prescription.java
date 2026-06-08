@@ -85,7 +85,7 @@ public class Prescription {
     @Column(name = "provider_signature", length = 500)
     private String providerSignature;
 
-    @Column(name = "issued_at", nullable = false, updatable = false)
+    @Column(name = "issued_at", nullable = false, updatable = false, columnDefinition = "TIMESTAMPTZ DEFAULT NOW()")
     private OffsetDateTime issuedAt;
 
     @Column(name = "valid_until")
