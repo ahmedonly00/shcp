@@ -1,14 +1,18 @@
 "use strict";
 
-process.env.JWT_SECRET = "test-secret-at-least-32-chars-long!!";
+// auth.js base64-decodes JWT_SECRET before using it as the HMAC key,
+// and verifies with HS384.  Tests must match both conventions.
+const RAW_SECRET = "test-secret-at-least-32-chars-long!!";
+process.env.JWT_SECRET = Buffer.from(RAW_SECRET).toString("base64");
 
 const jwt = require("jsonwebtoken");
 const { verifyToken } = require("../src/auth");
 
-const SECRET = process.env.JWT_SECRET;
+// Sign with the raw (pre-encoded) secret so the decoded value matches
+const SIGNING_SECRET = Buffer.from(process.env.JWT_SECRET, "base64");
 
 function sign(payload, opts = {}) {
-  return jwt.sign(payload, SECRET, { algorithm: "HS256", expiresIn: "1h", ...opts });
+  return jwt.sign(payload, SIGNING_SECRET, { algorithm: "HS384", expiresIn: "1h", ...opts });
 }
 
 describe("verifyToken", () => {
