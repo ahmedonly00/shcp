@@ -89,10 +89,24 @@ export interface PrescriptionRow {
   status: string;
 }
 
+export interface NearestPharmacyDto extends PharmacyDto {
+  /** Haversine distance in km — null when no GPS was provided in the query. */
+  distanceKm: number | null;
+  /** Admin-area match quality: CELL, SECTOR, DISTRICT, or OTHER. */
+  matchLevel: 'CELL' | 'SECTOR' | 'DISTRICT' | 'OTHER';
+}
+
 // ── Pharmacies (public + admin) ────────────────────────────────────────────
 
 export const listPharmacies = () =>
   apiClient.get<{ data: PharmacyDto[] }>('/pharmacies').then(unwrap);
+
+export const getNearestPharmacies = (params: {
+  district?: string; sector?: string; cell?: string;
+  lat?: number; lng?: number; limit?: number;
+}) =>
+  apiClient.get<{ data: NearestPharmacyDto[] }>('/pharmacies/nearest', { params })
+    .then(unwrap<NearestPharmacyDto[]>);
 
 export interface PharmacyPayload {
   name: string;

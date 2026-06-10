@@ -6,6 +6,7 @@ import { Button } from '@/app/components/ui/button';
 import {
   Users, Calendar, AlertCircle,
   UserCheck, FileText, Loader2, Download,
+  Building2, Pill, Bike,
 } from 'lucide-react';
 import { Skeleton } from '@/app/components/ui/skeleton';
 import {
@@ -215,6 +216,57 @@ export const Analytics: React.FC = () => {
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Pharmacy Network */}
+      <div>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Pharmacy Network</p>
+        <div className="grid md:grid-cols-3 gap-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Registered Pharmacies</p>
+                  <p className="text-2xl font-bold">{statValue(stats?.totalPharmacies)}</p>
+                  <p className="text-xs text-muted-foreground">Active</p>
+                </div>
+                <div className="h-12 w-12 bg-teal-100 rounded-full flex items-center justify-center">
+                  <Building2 className="h-6 w-6 text-teal-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Pharmacists</p>
+                  <p className="text-2xl font-bold">{statValue(stats?.totalPharmacists)}</p>
+                  <p className="text-xs text-muted-foreground">Registered staff</p>
+                </div>
+                <div className="h-12 w-12 bg-cyan-100 rounded-full flex items-center justify-center">
+                  <Pill className="h-6 w-6 text-cyan-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Delivery Bikers</p>
+                  <p className="text-2xl font-bold">{statValue(stats?.totalBikers)}</p>
+                  <p className="text-xs text-muted-foreground">Registered riders</p>
+                </div>
+                <div className="h-12 w-12 bg-orange-100 rounded-full flex items-center justify-center">
+                  <Bike className="h-6 w-6 text-orange-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       <Tabs defaultValue="overview" className="w-full">

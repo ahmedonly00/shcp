@@ -9,7 +9,7 @@ import {
   Video, VideoOff, Mic, MicOff, PhoneOff, MessageSquare,
   FileText, Clock, User, Maximize, Loader2, WifiOff, Calendar as CalendarIcon, Monitor, MonitorOff,
   Circle, Square, Send, Zap, Star, Building2, ChevronLeft, ToggleLeft, ToggleRight,
-  Plus, Trash2, Pill, CheckCircle, AlertCircle, MapPin
+  Plus, Trash2, Pill, CheckCircle, AlertCircle, MapPin, Navigation, Bell, ChevronDown
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
@@ -18,7 +18,7 @@ import { patientsApi } from '@/app/api/patients';
 import { providersApi } from '@/app/api/providers';
 import { referralsApi } from '@/app/api/referrals';
 import { prescriptionsApi, MedicationItem } from '@/app/api/prescriptions';
-import { listPharmacies, PharmacyDto } from '@/app/api/pharmacist';
+import { listPharmacies, PharmacyDto, getNearestPharmacies, NearestPharmacyDto } from '@/app/api/pharmacist';
 import { ApiConsultationDto, ApiHealthRecordDto, ApiInstantAvailableProvider, ApiPrescriptionDto, ApiSymptomReport, ApiSymptomReportSummary, Appointment, mapApiAppointment, isAppointmentExpired } from '@/app/types';
 import { useAuth } from '@/app/context/AuthContext';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/app/components/ui/dialog';
@@ -178,8 +178,12 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
   const [rxConflicts, setRxConflicts] = useState<string[]>([]);
   const [pharmacies, setPharmacies] = useState<PharmacyDto[]>([]);
   const [loadingPharmacies, setLoadingPharmacies] = useState(false);
+  const [nearestPharmacies, setNearestPharmacies] = useState<NearestPharmacyDto[]>([]);
+  const [loadingNearest, setLoadingNearest] = useState(false);
   const [issuingRx, setIssuingRx] = useState(false);
   const [issuedRxList, setIssuedRxList] = useState<ApiPrescriptionDto[]>([]);
+  const [notifyingPharmacy, setNotifyingPharmacy] = useState<string | null>(null);
+  const [showPostCallRxForm, setShowPostCallRxForm] = useState(false);
 
   const [ehrSummary, setEhrSummary] = useState<ApiHealthRecordDto | null>(null);
   const [symptomReport, setSymptomReport] = useState<ApiSymptomReport | ApiSymptomReportSummary | null>(null);
@@ -1247,6 +1251,30 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
       .finally(() => setLoadingPharmacies(false));
   }, [activeTab, isProvider]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Fetch nearest pharmacies (debounced 600 ms) whenever delivery location changes
+  useEffect(() => {
+    if (!isProvider) return;
+    if (!rxDistrict && !rxLatitude) {
+      setNearestPharmacies([]);
+      return;
+    }
+    const timer = setTimeout(() => {
+      setLoadingNearest(true);
+      getNearestPharmacies({
+        district: rxDistrict  || undefined,
+        sector:   rxSector    || undefined,
+        cell:     rxCell      || undefined,
+        lat:      rxLatitude  ? Number(rxLatitude)  : undefined,
+        lng:      rxLongitude ? Number(rxLongitude) : undefined,
+        limit:    5,
+      })
+        .then(list => setNearestPharmacies(list ?? []))
+        .catch(() => setNearestPharmacies([]))
+        .finally(() => setLoadingNearest(false));
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [rxDistrict, rxSector, rxCell, rxLatitude, rxLongitude, isProvider]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ─── Prescription issuance ────────────────────────────────────────────────
 
   const handleIssuePrescription = async () => {
@@ -1294,6 +1322,18 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
     }
   };
 
+  const handleRenotifyPharmacy = async (prescriptionId: string, pharmacyName: string) => {
+    setNotifyingPharmacy(prescriptionId);
+    try {
+      await prescriptionsApi.notifyPharmacy(prescriptionId);
+      toast.success(`${pharmacyName} has been notified`);
+    } catch {
+      toast.error('Failed to notify pharmacy');
+    } finally {
+      setNotifyingPharmacy(null);
+    }
+  };
+
   // ─── Render: Ended ────────────────────────────────────────────────────────
 
   if (phase === 'ended') {
@@ -1332,6 +1372,254 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
             </div>
           </CardContent>
         </Card>
+
+        {/* Prescription card — provider post-call */}
+        {isProvider && (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Pill className="h-4 w-4 text-green-600" />
+                Prescriptions
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {issuedRxList.length === 0 && !showPostCallRxForm && (
+                <p className="text-sm text-muted-foreground text-center py-2">
+                  No prescription was issued during this consultation.
+                </p>
+              )}
+
+              {/* Prescriptions issued during the call */}
+              {issuedRxList.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Issued This Session</p>
+                  {issuedRxList.map(rx => {
+                    let meds: Array<{ name: string; dosage?: string; frequency?: string; durationDays?: number }> = [];
+                    try { meds = JSON.parse(rx.medications) ?? []; } catch { meds = []; }
+                    return (
+                      <div key={rx.prescriptionId} className="border rounded-lg p-3 space-y-2 bg-green-50 border-green-200">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="h-4 w-4 text-green-600 shrink-0" />
+                          <span className="text-xs font-semibold text-green-800">
+                            {meds.length} medication{meds.length !== 1 ? 's' : ''} · valid until {rx.validUntil?.split('T')[0]}
+                          </span>
+                        </div>
+                        {meds.map((m, i) => (
+                          <p key={i} className="text-xs text-green-700 pl-6">
+                            {m.name} {m.dosage} — {m.frequency} × {m.durationDays}d
+                          </p>
+                        ))}
+                        {rx.pharmacyName ? (
+                          <div className="flex items-center justify-between pl-6">
+                            <p className="text-xs text-green-600 flex items-center gap-1">
+                              <Building2 className="h-3 w-3" /> Routed to: {rx.pharmacyName}
+                            </p>
+                            <button
+                              className="text-xs text-primary hover:underline flex items-center gap-1 disabled:opacity-50"
+                              disabled={notifyingPharmacy === rx.prescriptionId}
+                              onClick={() => handleRenotifyPharmacy(rx.prescriptionId, rx.pharmacyName!)}
+                            >
+                              {notifyingPharmacy === rx.prescriptionId
+                                ? <Loader2 className="h-3 w-3 animate-spin" />
+                                : <Bell className="h-3 w-3" />}
+                              Re-notify
+                            </button>
+                          </div>
+                        ) : (
+                          <p className="text-xs text-amber-600 pl-6">No pharmacy assigned</p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Issue another prescription after the call */}
+              {consultationRef.current && (
+                <button
+                  className="w-full flex items-center justify-between border rounded-lg px-3 py-2 text-sm text-primary hover:bg-primary/5 transition-colors"
+                  onClick={() => setShowPostCallRxForm(v => !v)}
+                >
+                  <span className="flex items-center gap-2">
+                    <Plus className="h-4 w-4" />
+                    Issue {issuedRxList.length > 0 ? 'another' : 'a'} prescription
+                  </span>
+                  <ChevronDown className={`h-4 w-4 transition-transform ${showPostCallRxForm ? 'rotate-180' : ''}`} />
+                </button>
+              )}
+
+              {showPostCallRxForm && consultationRef.current && (
+                <div className="border rounded-lg p-3 space-y-3 bg-muted/20">
+                  {/* Medication rows */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Medications *</p>
+                      <button
+                        onClick={() => setRxMedications(prev => [...prev, { name: '', dosage: '', frequency: '', durationDays: 7 }])}
+                        className="text-xs text-primary hover:underline flex items-center gap-1"
+                      >
+                        <Plus className="h-3 w-3" /> Add
+                      </button>
+                    </div>
+                    {rxMedications.map((med, idx) => (
+                      <div key={idx} className="border rounded-lg p-2.5 space-y-2 bg-white relative">
+                        {rxMedications.length > 1 && (
+                          <button
+                            onClick={() => setRxMedications(prev => prev.filter((_, i) => i !== idx))}
+                            className="absolute top-2 right-2 text-muted-foreground hover:text-red-500"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                        <input
+                          className="w-full border rounded px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+                          placeholder="Drug name"
+                          value={med.name}
+                          onChange={e => setRxMedications(prev => prev.map((m, i) => i === idx ? { ...m, name: e.target.value } : m))}
+                        />
+                        <div className="grid grid-cols-2 gap-2">
+                          <input
+                            className="border rounded px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+                            placeholder="Dosage"
+                            value={med.dosage}
+                            onChange={e => setRxMedications(prev => prev.map((m, i) => i === idx ? { ...m, dosage: e.target.value } : m))}
+                          />
+                          <input
+                            className="border rounded px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+                            placeholder="Frequency"
+                            value={med.frequency}
+                            onChange={e => setRxMedications(prev => prev.map((m, i) => i === idx ? { ...m, frequency: e.target.value } : m))}
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs text-muted-foreground whitespace-nowrap">Duration (days)</label>
+                          <input
+                            type="number" min={1} max={365}
+                            className="w-16 border rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+                            value={med.durationDays}
+                            onChange={e => setRxMedications(prev => prev.map((m, i) => i === idx ? { ...m, durationDays: Number(e.target.value) || 1 } : m))}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Instructions */}
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Instructions</label>
+                    <textarea
+                      className="w-full border rounded-md px-2.5 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary resize-none mt-1"
+                      rows={2}
+                      placeholder="Take with food, avoid alcohol, etc."
+                      value={rxInstructions}
+                      onChange={e => setRxInstructions(e.target.value)}
+                    />
+                  </div>
+
+                  {/* Valid for days */}
+                  <div className="flex items-center gap-3">
+                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Valid for (days)</label>
+                    <input
+                      type="number" min={1} max={365}
+                      className="w-20 border rounded px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+                      value={rxValidDays}
+                      onChange={e => setRxValidDays(Number(e.target.value) || 30)}
+                    />
+                  </div>
+
+                  {/* Delivery location */}
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Delivery Location</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      <input className="border rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary" placeholder="District" value={rxDistrict} onChange={e => setRxDistrict(e.target.value)} />
+                      <input className="border rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary" placeholder="Sector" value={rxSector} onChange={e => setRxSector(e.target.value)} />
+                      <input className="border rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary" placeholder="Cell" value={rxCell} onChange={e => setRxCell(e.target.value)} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input className="border rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary" placeholder="Latitude" value={rxLatitude} onChange={e => setRxLatitude(e.target.value)} />
+                      <input className="border rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary" placeholder="Longitude" value={rxLongitude} onChange={e => setRxLongitude(e.target.value)} />
+                    </div>
+                    {((rxLatitude && !rxLongitude) || (!rxLatitude && rxLongitude)) && (
+                      <p className="text-xs text-amber-600 flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" /> Both latitude and longitude are required for GPS routing.
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Nearest pharmacies */}
+                  {(rxDistrict || rxLatitude) && (
+                    <div className="space-y-1.5">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                        <MapPin className="h-3 w-3" /> Nearest Pharmacies
+                      </p>
+                      {loadingNearest ? (
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground py-1">
+                          <Loader2 className="h-3 w-3 animate-spin" /> Finding…
+                        </div>
+                      ) : nearestPharmacies.length > 0 ? (
+                        <div className="space-y-1">
+                          <button type="button" onClick={() => setRxPharmacyId('')}
+                            className={`w-full flex items-center gap-2 rounded-lg border px-3 py-2 text-left transition-colors text-xs ${rxPharmacyId === '' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border hover:border-primary/40'}`}>
+                            <div className={`h-3.5 w-3.5 rounded-full border-2 flex-shrink-0 ${rxPharmacyId === '' ? 'border-primary bg-primary' : 'border-muted-foreground'}`} />
+                            <span className="font-semibold">Auto-assign</span>
+                          </button>
+                          {nearestPharmacies.map(p => (
+                            <button key={p.pharmacyId} type="button" onClick={() => setRxPharmacyId(p.pharmacyId)}
+                              className={`w-full flex items-center gap-2 rounded-lg border px-3 py-2 text-left transition-colors text-xs ${rxPharmacyId === p.pharmacyId ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border hover:border-primary/40'}`}>
+                              <div className={`h-3.5 w-3.5 rounded-full border-2 flex-shrink-0 ${rxPharmacyId === p.pharmacyId ? 'border-primary bg-primary' : 'border-muted-foreground'}`} />
+                              <div>
+                                <span className="font-medium">{p.name}</span>
+                                {p.distanceKm != null && (
+                                  <span className="text-muted-foreground ml-1">
+                                    — {p.distanceKm < 1 ? `${Math.round(p.distanceKm * 1000)}m` : `${p.distanceKm.toFixed(1)}km`}
+                                  </span>
+                                )}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="space-y-1.5">
+                          <p className="text-xs text-amber-600 flex items-center gap-1">
+                            <AlertCircle className="h-3 w-3" /> No nearby pharmacies found. Showing all:
+                          </p>
+                          {pharmacies.map(p => (
+                            <button key={p.pharmacyId} type="button" onClick={() => setRxPharmacyId(p.pharmacyId)}
+                              className={`w-full flex items-center gap-2 rounded-lg border px-3 py-2 text-left transition-colors text-xs ${rxPharmacyId === p.pharmacyId ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border hover:border-primary/40'}`}>
+                              <div className={`h-3.5 w-3.5 rounded-full border-2 flex-shrink-0 ${rxPharmacyId === p.pharmacyId ? 'border-primary bg-primary' : 'border-muted-foreground'}`} />
+                              <span className="font-medium">{p.name}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Conflicts */}
+                  {rxConflicts.length > 0 && (
+                    <div className="rounded-lg border border-red-200 bg-red-50 p-3 space-y-1">
+                      <p className="text-xs font-semibold text-red-800 flex items-center gap-1.5">
+                        <AlertCircle className="h-3.5 w-3.5" /> Potential conflicts detected
+                      </p>
+                      {rxConflicts.map((c, i) => <p key={i} className="text-xs text-red-700 pl-5">{c}</p>)}
+                    </div>
+                  )}
+
+                  <Button
+                    className="w-full bg-green-600 hover:bg-green-700 text-white"
+                    onClick={handleIssuePrescription}
+                    disabled={issuingRx}
+                  >
+                    {issuingRx
+                      ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Issuing…</>
+                      : <><Pill className="h-4 w-4 mr-2" />Issue Prescription</>
+                    }
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Prescription card — patient only */}
         {!isProvider && (
@@ -2388,10 +2676,24 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
                               {m.name} {m.dosage} — {m.frequency} × {m.durationDays}d
                             </p>
                           ))}
-                          {rx.pharmacyName && (
-                            <p className="text-xs text-green-600 pl-6 flex items-center gap-1">
-                              <Building2 className="h-3 w-3" /> Routed to: {rx.pharmacyName}
-                            </p>
+                          {rx.pharmacyName ? (
+                            <div className="flex items-center justify-between pl-6">
+                              <p className="text-xs text-green-600 flex items-center gap-1">
+                                <Building2 className="h-3 w-3" /> Routed to: {rx.pharmacyName}
+                              </p>
+                              <button
+                                className="text-xs text-primary hover:underline flex items-center gap-1 disabled:opacity-50"
+                                disabled={notifyingPharmacy === rx.prescriptionId}
+                                onClick={() => handleRenotifyPharmacy(rx.prescriptionId, rx.pharmacyName!)}
+                              >
+                                {notifyingPharmacy === rx.prescriptionId
+                                  ? <Loader2 className="h-3 w-3 animate-spin" />
+                                  : <Bell className="h-3 w-3" />}
+                                Re-notify
+                              </button>
+                            </div>
+                          ) : (
+                            <p className="text-xs text-amber-600 pl-6">No pharmacy assigned</p>
                           )}
                         </div>
                       );
@@ -2534,31 +2836,141 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
                       onChange={e => setRxLongitude(e.target.value)}
                     />
                   </div>
+                  {((rxLatitude && !rxLongitude) || (!rxLatitude && rxLongitude)) && (
+                    <p className="text-xs text-amber-600 flex items-center gap-1 pt-1">
+                      <AlertCircle className="h-3 w-3" /> Both latitude and longitude are required for GPS routing.
+                    </p>
+                  )}
                 </div>
 
-                {/* Manual pharmacy override */}
+                {/* Nearest pharmacies — shown when delivery location is filled in */}
                 <div className="space-y-1.5">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1">
-                    <MapPin className="h-3 w-3" /> Pharmacy Override (optional)
+                    <MapPin className="h-3 w-3" /> Nearest Pharmacies
                   </p>
-                  <p className="text-xs text-muted-foreground/70">Leave blank to auto-assign the nearest pharmacy with stock</p>
-                  {loadingPharmacies ? (
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Loader2 className="h-3 w-3 animate-spin" /> Loading pharmacies…
+
+                  {loadingNearest ? (
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground py-2">
+                      <Loader2 className="h-3 w-3 animate-spin" /> Finding nearest pharmacies…
+                    </div>
+                  ) : !rxDistrict && !rxLatitude ? (
+                    <p className="text-xs text-muted-foreground/60 italic py-1">
+                      Enter a delivery district or GPS coordinates above to see nearby pharmacies.
+                    </p>
+                  ) : nearestPharmacies.length === 0 ? (
+                    <div className="space-y-1.5">
+                      <p className="text-xs text-amber-600 flex items-center gap-1 py-1">
+                        <AlertCircle className="h-3 w-3" /> No pharmacies found near that location.
+                      </p>
+                      {pharmacies.length > 0 && (
+                        <>
+                          <p className="text-xs text-muted-foreground/70">Showing all active pharmacies:</p>
+                          <div className="space-y-1">
+                            {pharmacies.map(p => (
+                              <button
+                                key={p.pharmacyId}
+                                type="button"
+                                onClick={() => setRxPharmacyId(p.pharmacyId)}
+                                className={`w-full flex items-center gap-2 rounded-lg border px-3 py-2 text-left transition-colors ${
+                                  rxPharmacyId === p.pharmacyId
+                                    ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                                    : 'border-border hover:border-primary/40 hover:bg-muted/40'
+                                }`}
+                              >
+                                <div className={`h-3.5 w-3.5 rounded-full border-2 flex-shrink-0 ${rxPharmacyId === p.pharmacyId ? 'border-primary bg-primary' : 'border-muted-foreground'}`} />
+                                <div>
+                                  <span className="text-xs font-medium">{p.name}</span>
+                                  {p.address && <span className="text-xs text-muted-foreground ml-1">— {p.address}</span>}
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        </>
+                      )}
                     </div>
                   ) : (
-                    <select
-                      className="w-full border rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary bg-background"
-                      value={rxPharmacyId}
-                      onChange={e => setRxPharmacyId(e.target.value)}
-                    >
-                      <option value="">Auto-assign (recommended)</option>
-                      {pharmacies.map(p => (
-                        <option key={p.pharmacyId} value={p.pharmacyId}>
-                          {p.name}{p.district ? ` — ${p.district}` : ''}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="space-y-1.5">
+                      {/* Auto-assign option */}
+                      <button
+                        type="button"
+                        onClick={() => setRxPharmacyId('')}
+                        className={`w-full flex items-center gap-2 rounded-lg border px-3 py-2 text-left transition-colors ${
+                          rxPharmacyId === ''
+                            ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                            : 'border-border hover:border-primary/40 hover:bg-muted/40'
+                        }`}
+                      >
+                        <div className={`h-3.5 w-3.5 rounded-full border-2 flex-shrink-0 ${rxPharmacyId === '' ? 'border-primary bg-primary' : 'border-muted-foreground'}`} />
+                        <div>
+                          <span className="text-xs font-semibold">Auto-assign</span>
+                          <span className="text-xs text-muted-foreground ml-1">(system picks best)</span>
+                        </div>
+                      </button>
+
+                      {/* Ranked pharmacy list */}
+                      {nearestPharmacies.map((p, idx) => {
+                        const isSelected = rxPharmacyId === p.pharmacyId;
+                        const matchColors: Record<string, string> = {
+                          CELL:     'bg-green-100 text-green-700 border-green-200',
+                          SECTOR:   'bg-blue-100 text-blue-700 border-blue-200',
+                          DISTRICT: 'bg-violet-100 text-violet-700 border-violet-200',
+                          OTHER:    'bg-gray-100 text-gray-600 border-gray-200',
+                        };
+                        const matchLabels: Record<string, string> = {
+                          CELL: 'Cell match', SECTOR: 'Sector match',
+                          DISTRICT: 'District match', OTHER: 'Other',
+                        };
+                        const locationLine = [p.district, p.sector, p.cell].filter(Boolean).join(' › ');
+                        return (
+                          <button
+                            key={p.pharmacyId}
+                            type="button"
+                            onClick={() => setRxPharmacyId(p.pharmacyId)}
+                            className={`w-full flex items-start gap-2 rounded-lg border px-3 py-2 text-left transition-colors ${
+                              isSelected
+                                ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                                : 'border-border hover:border-primary/40 hover:bg-muted/40'
+                            }`}
+                          >
+                            <div className={`mt-0.5 h-3.5 w-3.5 rounded-full border-2 flex-shrink-0 ${isSelected ? 'border-primary bg-primary' : 'border-muted-foreground'}`} />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                {idx === 0 && !isSelected && (
+                                  <span className="text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-1 rounded">
+                                    Recommended
+                                  </span>
+                                )}
+                                {isSelected && (
+                                  <span className="text-[10px] font-bold text-primary bg-primary/10 border border-primary/20 px-1 rounded flex items-center gap-0.5">
+                                    <CheckCircle className="h-2.5 w-2.5" /> Selected
+                                  </span>
+                                )}
+                                <span className="text-xs font-semibold truncate">{p.name}</span>
+                              </div>
+                              <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded border ${matchColors[p.matchLevel]}`}>
+                                  {matchLabels[p.matchLevel]}
+                                </span>
+                                {p.distanceKm != null && (
+                                  <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                                    <Navigation className="h-2.5 w-2.5" />
+                                    {p.distanceKm < 1
+                                      ? `${Math.round(p.distanceKm * 1000)} m`
+                                      : `${p.distanceKm.toFixed(1)} km`}
+                                  </span>
+                                )}
+                              </div>
+                              {locationLine && (
+                                <p className="text-[10px] text-muted-foreground mt-0.5 truncate">{locationLine}</p>
+                              )}
+                              {p.phone && (
+                                <p className="text-[10px] text-muted-foreground truncate">{p.phone}</p>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
 

@@ -9,10 +9,12 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import rw.shcp.analytics.dto.*;
 import rw.shcp.common.response.ApiResponse;
 import rw.shcp.common.util.SecurityUtils;
 
+import java.io.IOException;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -147,6 +149,28 @@ public class AnalyticsController {
     public ResponseEntity<ApiResponse<ScheduledReportConfigDto>> saveScheduledConfig(
             @RequestBody ScheduledReportConfigDto dto) {
         return ResponseEntity.ok(ApiResponse.ok(analyticsService.saveScheduledConfig(dto)));
+    }
+
+    @PostMapping("/admin/report/send-now")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Send MOH report immediately to configured recipients")
+    public ResponseEntity<ApiResponse<String>> sendMohReportNow(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) List<String> metrics) {
+        analyticsService.sendReportNow(from, to, metrics);
+        return ResponseEntity.ok(ApiResponse.ok("Report sent successfully to configured recipients"));
+    }
+
+    @PostMapping(value = "/admin/report/send-pdf", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Send a pre-generated PDF report immediately to configured recipients")
+    public ResponseEntity<ApiResponse<String>> sendMohReportPdf(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestPart("pdf") MultipartFile pdf) throws IOException {
+        analyticsService.sendReportPdfNow(from, to, pdf.getBytes());
+        return ResponseEntity.ok(ApiResponse.ok("Report sent successfully to configured recipients"));
     }
 
     // ── Provider endpoint ─────────────────────────────────────────────────────

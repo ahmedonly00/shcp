@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import rw.shcp.common.response.ApiResponse;
 import rw.shcp.pharmacy.dto.AddPharmacistRequest;
 import rw.shcp.pharmacy.dto.CreatePharmacyRequest;
+import rw.shcp.pharmacy.dto.NearestPharmacyDto;
 import rw.shcp.pharmacy.dto.PharmacistProfileDto;
 import rw.shcp.pharmacy.dto.PharmacyDto;
 
@@ -30,6 +31,20 @@ public class PharmacyController {
     @Operation(summary = "List all active pharmacies (public)")
     public ResponseEntity<ApiResponse<List<PharmacyDto>>> listActive() {
         return ResponseEntity.ok(ApiResponse.ok(pharmacyService.listActive()));
+    }
+
+    @GetMapping("/nearest")
+    @PreAuthorize("hasAnyRole('ADMIN','PROVIDER')")
+    @Operation(summary = "Find nearest pharmacies to a delivery location (PROVIDER/ADMIN only)")
+    public ResponseEntity<ApiResponse<List<NearestPharmacyDto>>> findNearest(
+            @RequestParam(required = false) String district,
+            @RequestParam(required = false) String sector,
+            @RequestParam(required = false) String cell,
+            @RequestParam(required = false) Double lat,
+            @RequestParam(required = false) Double lng,
+            @RequestParam(defaultValue = "5") int limit) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                pharmacyService.findNearest(district, sector, cell, lat, lng, limit)));
     }
 
     @GetMapping("/{id}")

@@ -296,18 +296,22 @@ export const EnhancedRegisterForm: React.FC<RegisterFormProps> = ({ onSuccess })
           </div>
 
           {[
-            { id: 'reg-name', label: 'Full Name *', field: 'name', type: 'text', placeholder: 'Enter your full name', icon: <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground/70" /> },
-            { id: 'reg-email', label: 'Email Address *', field: 'email', type: 'email', placeholder: 'your.email@example.com', icon: <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground/70" /> },
-            { id: 'reg-phone', label: 'Phone Number *', field: 'phone', type: 'tel', placeholder: '+250 788 123 456', icon: <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground/70" /> },
+            { id: 'reg-name',  label: 'Full Name *',     field: 'name',  type: 'text',  placeholder: 'Enter your full name',   maxLength: 100, icon: <User  className="absolute left-3 top-3 h-4 w-4 text-muted-foreground/70" /> },
+            { id: 'reg-email', label: 'Email Address *', field: 'email', type: 'email', placeholder: 'your.email@example.com', maxLength: 150, icon: <Mail  className="absolute left-3 top-3 h-4 w-4 text-muted-foreground/70" /> },
+            { id: 'reg-phone', label: 'Phone Number *',  field: 'phone', type: 'tel',   placeholder: '+250788123456',          maxLength: 14,  icon: <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground/70" /> },
           ].map(f => (
             <div key={f.id} className="space-y-1.5">
               <Label htmlFor={f.id}>{f.label}</Label>
               <div className="relative">
                 {f.icon}
                 <Input id={f.id} type={f.type} placeholder={f.placeholder} className="pl-10"
+                  maxLength={f.maxLength}
                   value={formData[f.field as keyof typeof formData] as string}
                   onChange={e => handleChange(f.field, e.target.value)} required />
               </div>
+              {f.field === 'phone' && (
+                <p className="text-xs text-muted-foreground/70">Format: +250 followed by 9 digits (e.g. +250788123456)</p>
+              )}
             </div>
           ))}
 
@@ -353,8 +357,10 @@ export const EnhancedRegisterForm: React.FC<RegisterFormProps> = ({ onSuccess })
                 <Label htmlFor="reg-national-id">National ID Number *</Label>
                 <div className="relative">
                   <Shield className="absolute left-3 top-3 h-4 w-4 text-muted-foreground/70" />
-                  <Input id="reg-national-id" placeholder="Enter your national ID" className="pl-10"
-                    value={formData.nationalId} onChange={e => handleChange('nationalId', e.target.value)} required />
+                  <Input id="reg-national-id" placeholder="16-digit national ID" className="pl-10"
+                    inputMode="numeric" minLength={16} maxLength={16}
+                    value={formData.nationalId}
+                    onChange={e => handleChange('nationalId', e.target.value.replace(/\D/g, '').slice(0, 16))} required />
                 </div>
               </div>
             </>

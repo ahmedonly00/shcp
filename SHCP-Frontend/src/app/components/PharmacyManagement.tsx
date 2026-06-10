@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { LocationPicker } from '@/app/components/ui/LocationPicker';
 import { Card, CardContent, CardHeader, CardTitle } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
@@ -15,6 +16,8 @@ import {
 import { toast } from 'sonner';
 
 export const PharmacyManagement: React.FC = () => {
+  const { t } = useTranslation();
+
   // ── Pharmacy state ────────────────────────────────────────────────────────
   const [pharmacies, setPharmacies] = useState<PharmacyDto[]>([]);
   const [loadingPharmacies, setLoadingPharmacies] = useState(false);
@@ -40,7 +43,7 @@ export const PharmacyManagement: React.FC = () => {
     setLoadingPharmacies(true);
     listPharmacies()
       .then(setPharmacies)
-      .catch(() => toast.error('Failed to load pharmacies'))
+      .catch(() => toast.error(t('pharmacyManagement.toastFailedPharmacies')))
       .finally(() => setLoadingPharmacies(false));
   };
 
@@ -69,14 +72,14 @@ export const PharmacyManagement: React.FC = () => {
       if (editingPharmacy) {
         const updated = await updatePharmacy(editingPharmacy.pharmacyId, pharmacyForm);
         setPharmacies(ps => ps.map(p => p.pharmacyId === updated.pharmacyId ? updated : p));
-        toast.success('Pharmacy updated');
+        toast.success(t('pharmacyManagement.toastPharmacyUpdated'));
       } else {
         const created = await createPharmacy(pharmacyForm);
         setPharmacies(ps => [...ps, created]);
-        toast.success('Pharmacy registered');
+        toast.success(t('pharmacyManagement.toastPharmacyRegistered'));
       }
       setPharmacyDialogOpen(false);
-    } catch { toast.error('Failed to save pharmacy'); }
+    } catch { toast.error(t('pharmacyManagement.toastFailedSave')); }
   };
 
   const handleTogglePharmacy = async (p: PharmacyDto) => {
@@ -84,13 +87,13 @@ export const PharmacyManagement: React.FC = () => {
       if (p.isActive) {
         await deactivatePharmacy(p.pharmacyId);
         setPharmacies(ps => ps.map(x => x.pharmacyId === p.pharmacyId ? { ...x, isActive: false } : x));
-        toast.success('Pharmacy deactivated');
+        toast.success(t('pharmacyManagement.toastPharmacyDeactivated'));
       } else {
         await activatePharmacy(p.pharmacyId);
         setPharmacies(ps => ps.map(x => x.pharmacyId === p.pharmacyId ? { ...x, isActive: true } : x));
-        toast.success('Pharmacy activated');
+        toast.success(t('pharmacyManagement.toastPharmacyActivated'));
       }
-    } catch { toast.error('Failed to update pharmacy'); }
+    } catch { toast.error(t('pharmacyManagement.toastFailedToggle')); }
   };
 
   // ── Pharmacist handlers ───────────────────────────────────────────────────
@@ -102,7 +105,7 @@ export const PharmacyManagement: React.FC = () => {
     try {
       const list = await getPharmacyPharmacists(pharmacyId);
       setPharmacistsMap(m => ({ ...m, [pharmacyId]: list }));
-    } catch { toast.error('Failed to load pharmacists'); }
+    } catch { toast.error(t('pharmacyManagement.toastFailedPharmacists')); }
     finally { setLoadingPharmacists(null); }
   };
 
@@ -126,9 +129,9 @@ export const PharmacyManagement: React.FC = () => {
       if (created.tempPassword) {
         setCreatedCredentials({ name: created.name, email: created.email, tempPassword: created.tempPassword });
       } else {
-        toast.success('Pharmacist account created — credentials sent via email');
+        toast.success(t('pharmacyManagement.toastPharmacistCreated'));
       }
-    } catch { toast.error('Failed to add pharmacist'); }
+    } catch { toast.error(t('pharmacyManagement.toastFailedAddPharmacist')); }
     finally { setSavingPharmacist(false); }
   };
 
@@ -137,34 +140,34 @@ export const PharmacyManagement: React.FC = () => {
     <div className="space-y-6">
       <div className="flex items-start justify-between">
         <div>
-          <h2 className="text-2xl font-bold">Pharmacy Management</h2>
-          <p className="text-muted-foreground">Register and manage pharmacies and their staff accounts</p>
+          <h2 className="text-2xl font-bold">{t('pharmacyManagement.title')}</h2>
+          <p className="text-muted-foreground">{t('pharmacyManagement.subtitle')}</p>
         </div>
       </div>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-3">
-          <CardTitle className="text-base font-semibold">Registered Pharmacies</CardTitle>
+          <CardTitle className="text-base font-semibold">{t('pharmacyManagement.registeredPharmacies')}</CardTitle>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={loadPharmacies}>
-              <RefreshCw className="h-4 w-4 mr-1" /> Refresh
+              <RefreshCw className="h-4 w-4 mr-1" /> {t('common.refresh')}
             </Button>
             <Button size="sm" className="bg-primary hover:bg-primary/90 text-white"
                     onClick={openAddPharmacy}>
-              + Add Pharmacy
+              + {t('pharmacyManagement.addPharmacy')}
             </Button>
           </div>
         </CardHeader>
         <CardContent>
           {loadingPharmacies ? (
             <div className="flex items-center justify-center py-10 text-muted-foreground/70">
-              <Loader2 className="h-5 w-5 animate-spin mr-2" /> Loading pharmacies…
+              <Loader2 className="h-5 w-5 animate-spin mr-2" /> {t('pharmacyManagement.loadingPharmacies')}
             </div>
           ) : pharmacies.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground/70">
               <Building2 className="h-10 w-10 mx-auto mb-3 text-muted-foreground/70" />
-              <p>No pharmacies registered yet.</p>
-              <p className="text-sm mt-1">Click <strong>+ Add Pharmacy</strong> to get started.</p>
+              <p>{t('pharmacyManagement.noPharmacies')}</p>
+              <p className="text-sm mt-1">{t('pharmacyManagement.noPharmaciesHint')}</p>
             </div>
           ) : (
             <div className="divide-y divide-border">
@@ -177,7 +180,7 @@ export const PharmacyManagement: React.FC = () => {
                         <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
                           p.isActive ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground'
                         }`}>
-                          {p.isActive ? 'Active' : 'Inactive'}
+                          {p.isActive ? t('pharmacyManagement.active') : t('pharmacyManagement.inactive')}
                         </span>
                       </div>
                       <p className="text-sm text-muted-foreground">{p.address}</p>
@@ -195,16 +198,16 @@ export const PharmacyManagement: React.FC = () => {
                       <Button
                         variant="outline" size="sm"
                         onClick={() => togglePharmacistList(p.pharmacyId)}
-                        title="Manage pharmacists"
+                        title={t('pharmacyManagement.pharmacists')}
                       >
                         <UserPlus className="h-3.5 w-3.5 mr-1" />
-                        Staff
+                        {t('pharmacyManagement.staff')}
                         {expandedPharmacy === p.pharmacyId
                           ? <ChevronUp className="h-3.5 w-3.5 ml-1" />
                           : <ChevronDown className="h-3.5 w-3.5 ml-1" />}
                       </Button>
                       <Button variant="outline" size="sm" onClick={() => openEditPharmacy(p)}>
-                        Edit
+                        {t('common.edit')}
                       </Button>
                       <Button
                         variant="outline"
@@ -214,7 +217,7 @@ export const PharmacyManagement: React.FC = () => {
                           : 'border-green-400 text-green-600 hover:bg-green-50'}
                         onClick={() => handleTogglePharmacy(p)}
                       >
-                        {p.isActive ? 'Deactivate' : 'Activate'}
+                        {p.isActive ? t('pharmacyManagement.deactivate') : t('pharmacyManagement.activate')}
                       </Button>
                     </div>
                   </div>
@@ -224,20 +227,20 @@ export const PharmacyManagement: React.FC = () => {
                     <div className="mt-3 ml-2 border-l-2 border-blue-100 pl-4">
                       <div className="flex items-center justify-between mb-2">
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                          Pharmacists
+                          {t('pharmacyManagement.pharmacists')}
                         </p>
                         <Button size="sm" variant="outline" className="h-7 text-xs"
                           onClick={() => openAddPharmacist(p.pharmacyId)}>
-                          <UserPlus className="h-3 w-3 mr-1" /> Add Pharmacist
+                          <UserPlus className="h-3 w-3 mr-1" /> {t('pharmacyManagement.addPharmacist')}
                         </Button>
                       </div>
                       {loadingPharmacists === p.pharmacyId ? (
                         <div className="flex items-center gap-2 py-2 text-xs text-muted-foreground/70">
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" /> {t('common.loading')}
                         </div>
                       ) : (pharmacistsMap[p.pharmacyId] ?? []).length === 0 ? (
                         <p className="text-xs text-muted-foreground/70 py-2 italic">
-                          No pharmacists yet — click "Add Pharmacist" to create an account.
+                          {t('pharmacyManagement.noPharmacists')}
                         </p>
                       ) : (
                         <div className="space-y-1">
@@ -263,39 +266,40 @@ export const PharmacyManagement: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Credentials display dialog — shown after account creation */}
+      {/* Credentials display dialog */}
       <Dialog open={!!createdCredentials} onOpenChange={() => setCreatedCredentials(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Pharmacist Account Created</DialogTitle>
+            <DialogTitle>{t('pharmacyManagement.accountCreated')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <p className="text-sm text-muted-foreground">
-              Share these credentials with <strong>{createdCredentials?.name}</strong> so they can log in.
-              They should change their password on first login.
+              {t('pharmacyManagement.shareCredentials', { name: createdCredentials?.name })}
+              {' '}
+              {t('pharmacyManagement.changePasswordHint')}
             </p>
             <div className="bg-muted/50 rounded-lg p-4 space-y-2 font-mono text-sm border">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Email</span>
+                <span className="text-muted-foreground">{t('common.email')}</span>
                 <span className="font-semibold select-all">{createdCredentials?.email}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Password</span>
+                <span className="text-muted-foreground">{t('pharmacyManagement.password')}</span>
                 <span className="font-semibold select-all text-blue-700">{createdCredentials?.tempPassword}</span>
               </div>
             </div>
             <p className="text-xs text-amber-600">
-              Copy these now — the password will not be shown again.
+              {t('pharmacyManagement.copyWarning')}
             </p>
             <Button className="w-full" onClick={() => {
               if (createdCredentials) {
                 navigator.clipboard.writeText(
                   `Email: ${createdCredentials.email}\nPassword: ${createdCredentials.tempPassword}`
                 );
-                toast.success('Credentials copied to clipboard');
+                toast.success(t('pharmacyManagement.toastCredentialsCopied'));
               }
             }}>
-              Copy to Clipboard
+              {t('pharmacyManagement.copyToClipboard')}
             </Button>
           </div>
         </DialogContent>
@@ -305,26 +309,26 @@ export const PharmacyManagement: React.FC = () => {
       <Dialog open={pharmacistDialogOpen} onOpenChange={setPharmacistDialogOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Add Pharmacist</DialogTitle>
+            <DialogTitle>{t('pharmacyManagement.addPharmacist')}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSavePharmacist} className="space-y-3 py-2">
             <p className="text-xs text-muted-foreground">
-              An account will be created with a temporary password sent via email.
+              {t('pharmacyManagement.addPharmacistHint')}
             </p>
             <div>
-              <Label>Full Name <span className="text-red-500">*</span></Label>
+              <Label>{t('auth.fullName')} <span className="text-red-500">*</span></Label>
               <Input required value={pharmacistForm.name}
                 onChange={e => setPharmacistForm(f => ({ ...f, name: e.target.value }))}
                 placeholder="e.g. Jean Paul Habimana" />
             </div>
             <div>
-              <Label>Email <span className="text-red-500">*</span></Label>
+              <Label>{t('common.email')} <span className="text-red-500">*</span></Label>
               <Input required type="email" value={pharmacistForm.email}
                 onChange={e => setPharmacistForm(f => ({ ...f, email: e.target.value }))}
                 placeholder="pharmacist@example.com" />
             </div>
             <div>
-              <Label>Phone <span className="text-red-500">*</span></Label>
+              <Label>{t('common.phone')} <span className="text-red-500">*</span></Label>
               <Input required value={pharmacistForm.phone}
                 onChange={e => setPharmacistForm(f => ({ ...f, phone: e.target.value }))}
                 placeholder="+250..." />
@@ -334,7 +338,7 @@ export const PharmacyManagement: React.FC = () => {
               {savingPharmacist
                 ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 : <UserPlus className="h-4 w-4 mr-2" />}
-              Create Account & Send Credentials
+              {t('pharmacyManagement.createAccount')}
             </Button>
           </form>
         </DialogContent>
@@ -344,17 +348,19 @@ export const PharmacyManagement: React.FC = () => {
       <Dialog open={pharmacyDialogOpen} onOpenChange={setPharmacyDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{editingPharmacy ? 'Edit Pharmacy' : 'Register New Pharmacy'}</DialogTitle>
+            <DialogTitle>
+              {editingPharmacy ? t('pharmacyManagement.editPharmacy') : t('pharmacyManagement.registerPharmacy')}
+            </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSavePharmacy} className="space-y-3 py-2">
             <div>
-              <Label>Name <span className="text-red-500">*</span></Label>
+              <Label>{t('common.name')} <span className="text-red-500">*</span></Label>
               <Input required value={pharmacyForm.name}
                 onChange={e => setPharmacyForm(f => ({ ...f, name: e.target.value }))}
                 placeholder="e.g. Kigali Central Pharmacy" />
             </div>
             <div>
-              <Label>Address <span className="text-red-500">*</span></Label>
+              <Label>{t('common.address')} <span className="text-red-500">*</span></Label>
               <Input required value={pharmacyForm.address}
                 onChange={e => setPharmacyForm(f => ({ ...f, address: e.target.value }))}
                 placeholder="Street / landmark" />
@@ -362,30 +368,30 @@ export const PharmacyManagement: React.FC = () => {
 
             <div className="bg-blue-50 rounded-lg p-3 space-y-2">
               <p className="text-xs font-semibold text-blue-700 mb-1">
-                Location (used for nearest-pharmacy matching)
+                {t('pharmacyManagement.locationLabel')}
               </p>
               <div className="grid grid-cols-3 gap-2">
                 <div>
-                  <Label className="text-xs">District</Label>
+                  <Label className="text-xs">{t('pharmacyManagement.district')}</Label>
                   <Input value={pharmacyForm.district ?? ''}
                     onChange={e => setPharmacyForm(f => ({ ...f, district: e.target.value }))}
                     placeholder="e.g. Gasabo" />
                 </div>
                 <div>
-                  <Label className="text-xs">Sector</Label>
+                  <Label className="text-xs">{t('pharmacyManagement.sector')}</Label>
                   <Input value={pharmacyForm.sector ?? ''}
                     onChange={e => setPharmacyForm(f => ({ ...f, sector: e.target.value }))}
                     placeholder="e.g. Remera" />
                 </div>
                 <div>
-                  <Label className="text-xs">Cell</Label>
+                  <Label className="text-xs">{t('pharmacyManagement.cell')}</Label>
                   <Input value={pharmacyForm.cell ?? ''}
                     onChange={e => setPharmacyForm(f => ({ ...f, cell: e.target.value }))}
                     placeholder="e.g. Rukiri I" />
                 </div>
               </div>
               <p className="text-xs text-blue-500">
-                More specific = higher priority when matching a patient's location.
+                {t('pharmacyManagement.locationHint')}
               </p>
             </div>
 
@@ -395,19 +401,19 @@ export const PharmacyManagement: React.FC = () => {
                 longitude={pharmacyForm.longitude}
                 onSelect={(lat, lon) => setPharmacyForm(f => ({ ...f, latitude: lat, longitude: lon }))}
                 searchHint={[pharmacyForm.name, pharmacyForm.address, pharmacyForm.district].filter(Boolean).join(', ')}
-                label="GPS Location (optional — improves nearest-pharmacy matching)"
+                label={t('pharmacyManagement.gpsLabel')}
               />
             </div>
 
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <Label className="text-xs">Phone</Label>
+                <Label className="text-xs">{t('common.phone')}</Label>
                 <Input value={pharmacyForm.phone ?? ''}
                   onChange={e => setPharmacyForm(f => ({ ...f, phone: e.target.value }))}
                   placeholder="+250..." />
               </div>
               <div>
-                <Label className="text-xs">Email</Label>
+                <Label className="text-xs">{t('common.email')}</Label>
                 <Input type="email" value={pharmacyForm.email ?? ''}
                   onChange={e => setPharmacyForm(f => ({ ...f, email: e.target.value }))}
                   placeholder="pharmacy@..." />
@@ -415,7 +421,7 @@ export const PharmacyManagement: React.FC = () => {
             </div>
 
             <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-white">
-              {editingPharmacy ? 'Save Changes' : 'Register Pharmacy'}
+              {editingPharmacy ? t('pharmacyManagement.saveChanges') : t('pharmacyManagement.registerBtn')}
             </Button>
           </form>
         </DialogContent>

@@ -344,6 +344,9 @@ export interface ApiPlatformStats {
   totalSymptomReports: number;
   totalPrescriptions: number;
   activePrescriptions: number;
+  totalPharmacies: number;
+  totalPharmacists: number;
+  totalBikers: number;
 }
 
 export interface ApiProviderStats {

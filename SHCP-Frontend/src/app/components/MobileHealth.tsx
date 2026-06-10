@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
 import { Badge } from '@/app/components/ui/badge';
@@ -58,10 +59,10 @@ const LIVE_TIMEOUT_MS = 10_000;
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-function goalIcon(title: string) {
-  if (title.toLowerCase().includes('step'))  return <Footprints className="h-5 w-5" />;
-  if (title.toLowerCase().includes('water')) return <Droplets   className="h-5 w-5" />;
-  if (title.toLowerCase().includes('sleep')) return <Moon       className="h-5 w-5" />;
+function goalIcon(id: string) {
+  if (id === '1') return <Footprints className="h-5 w-5" />;
+  if (id === '2') return <Droplets   className="h-5 w-5" />;
+  if (id === '3') return <Moon       className="h-5 w-5" />;
   return <Activity className="h-5 w-5" />;
 }
 
@@ -82,6 +83,7 @@ function batteryColor(pct: number) {
 // ── Component ──────────────────────────────────────────────────────────────────
 
 export const MobileHealth: React.FC = () => {
+  const { t } = useTranslation();
 
   // ── Data state ──────────────────────────────────────────────────────────────
   const [vitals,       setVitals]       = useState<VitalsData>({});
@@ -218,7 +220,7 @@ export const MobileHealth: React.FC = () => {
 
     const unsubDisconnect = bluetoothHealth.onDisconnect((deviceId) => {
       setBleDevices(prev => prev.filter(d => d.id !== deviceId));
-      toast.info('Device disconnected');
+      toast.info(t('mobileHealth.toastDeviceDisconnected'));
     });
 
     return () => {
@@ -234,7 +236,7 @@ export const MobileHealth: React.FC = () => {
 
   const handleScanBluetooth = async () => {
     if (!bluetoothHealth.isSupported()) {
-      toast.error('Web Bluetooth is not supported. Please use Chrome or Edge on Windows or Android.');
+      toast.error(t('mobileHealth.toastBluetoothNotSupported'));
       return;
     }
     setScanning(true);
@@ -245,12 +247,12 @@ export const MobileHealth: React.FC = () => {
         const filtered = prev.filter(d => d.id !== device.id);
         return [...filtered, { ...device, liveVitals: {} }];
       });
-      toast.success(`Connected to ${device.name}`);
+      toast.success(t('mobileHealth.toastConnectedTo', { name: device.name }));
     } catch (err) {
       const msg = (err as Error).message ?? '';
       // "User cancelled" is not an error we need to surface
       if (!msg.toLowerCase().includes('cancel') && !msg.toLowerCase().includes('chosen')) {
-        toast.error(msg || 'Could not connect to device');
+        toast.error(msg || t('mobileHealth.toastCouldNotConnect'));
       }
     } finally {
       setScanning(false);
@@ -260,15 +262,12 @@ export const MobileHealth: React.FC = () => {
   const handleDisconnect = useCallback(async (device: ConnectedBleDevice) => {
     await bluetoothHealth.disconnect(device.id);
     setBleDevices(prev => prev.filter(d => d.id !== device.id));
-    toast.info(`Disconnected from ${device.name}`);
+    toast.info(t('mobileHealth.toastDisconnectedFrom', { name: device.name }));
   }, []);
 
   const handleGoogleFitSync = async () => {
     if (!googleFit.isConfigured()) {
-      toast.error(
-        'Add VITE_GOOGLE_FIT_CLIENT_ID to your .env file to enable Google Fit sync.',
-        { duration: 6000 },
-      );
+      toast.error(t('mobileHealth.toastFitEnvHint'), { duration: 6000 });
       return;
     }
     setFitSyncing(true);
@@ -287,7 +286,7 @@ export const MobileHealth: React.FC = () => {
         }));
 
       if (entries.length === 0) {
-        toast.info('No activity data found in Google Fit for the last 7 days.');
+        toast.info(t('mobileHealth.toastFitNoData'));
         return;
       }
 
@@ -317,9 +316,9 @@ export const MobileHealth: React.FC = () => {
       const lastEntry = entries[entries.length - 1];
       if (lastEntry) {
         const updated = healthGoals.map(g => {
-          if (g.title.toLowerCase().includes('step'))     return { ...g, current: lastEntry.steps };
-          if (g.title.toLowerCase().includes('exercise')) return { ...g, current: lastEntry.exerciseMinutes };
-          if (g.title.toLowerCase().includes('sleep'))    return { ...g, current: lastEntry.sleepHours };
+          if (g.id === '1') return { ...g, current: lastEntry.steps };
+          if (g.id === '4') return { ...g, current: lastEntry.exerciseMinutes };
+          if (g.id === '3') return { ...g, current: lastEntry.sleepHours };
           return g;
         });
         await patientsApi.updateHealthGoals(updated).catch(() => {});
@@ -327,11 +326,11 @@ export const MobileHealth: React.FC = () => {
       }
 
       setFitLastSync(new Date());
-      toast.success(`Google Fit: imported ${entries.length} day(s) of activity data`);
+      toast.success(t('mobileHealth.toastFitSynced', { count: entries.length }));
     } catch (err) {
       const msg = (err as Error).message ?? '';
       if (!msg.includes('popup_closed')) {
-        toast.error(msg || 'Google Fit sync failed');
+        toast.error(msg || t('mobileHealth.toastFitFailed'));
       }
     } finally {
       setFitSyncing(false);
@@ -349,15 +348,15 @@ export const MobileHealth: React.FC = () => {
       await patientsApi.updateVitals(merged as Record<string, string>);
       setVitals(merged);
       latestVitals.current = merged;
-      toast.success('Vital signs updated');
+      toast.success(t('mobileHealth.toastVitalsUpdated'));
       setShowVitalsDialog(false);
-    } catch { toast.error('Failed to update vitals'); }
+    } catch { toast.error(t('mobileHealth.toastVitalsFailed')); }
     finally { setSavingVitals(false); }
   };
 
   const handleAddGoal = async () => {
     if (!newGoal.title.trim() || !newGoal.target || !newGoal.unit.trim()) {
-      toast.error('Please fill all goal fields'); return;
+      toast.error(t('mobileHealth.toastGoalFieldsRequired')); return;
     }
     setSavingGoal(true);
     try {
@@ -365,10 +364,10 @@ export const MobileHealth: React.FC = () => {
       const updated = [...healthGoals, goal];
       await patientsApi.updateHealthGoals(updated);
       setHealthGoals(updated);
-      toast.success('Goal added');
+      toast.success(t('mobileHealth.toastGoalAdded'));
       setShowGoalDialog(false);
       setNewGoal({ title: '', target: '', unit: '' });
-    } catch { toast.error('Failed to save goal'); }
+    } catch { toast.error(t('mobileHealth.toastGoalFailed')); }
     finally { setSavingGoal(false); }
   };
 
@@ -377,9 +376,9 @@ export const MobileHealth: React.FC = () => {
     try {
       await patientsApi.updateHealthGoals(updated);
       setHealthGoals(updated);
-      if (newCurrent >= goal.target) toast.success(`Goal "${goal.title}" achieved!`);
-      else toast.success('Progress updated');
-    } catch { toast.error('Failed to update progress'); }
+      if (newCurrent >= goal.target) toast.success(t('mobileHealth.toastGoalAchieved', { title: goal.title }));
+      else toast.success(t('mobileHealth.toastProgressUpdated'));
+    } catch { toast.error(t('mobileHealth.toastProgressFailed')); }
     setShowUpdateGoal(null);
   };
 
@@ -390,24 +389,24 @@ export const MobileHealth: React.FC = () => {
       const updated = await patientsApi.logActivity(entry);
       try { setActivityLogs(JSON.parse(updated.activityLogs || '[]').slice(-7)); } catch { /* */ }
       const goalsToUpdate = healthGoals.map(g => {
-        if (g.title.toLowerCase().includes('step'))     return { ...g, current: entry.steps };
-        if (g.title.toLowerCase().includes('water'))    return { ...g, current: entry.waterGlasses };
-        if (g.title.toLowerCase().includes('sleep'))    return { ...g, current: entry.sleepHours };
-        if (g.title.toLowerCase().includes('exercise')) return { ...g, current: entry.exerciseMinutes };
+        if (g.id === '1') return { ...g, current: entry.steps };
+        if (g.id === '2') return { ...g, current: entry.waterGlasses };
+        if (g.id === '3') return { ...g, current: entry.sleepHours };
+        if (g.id === '4') return { ...g, current: entry.exerciseMinutes };
         return g;
       });
       await patientsApi.updateHealthGoals(goalsToUpdate);
       setHealthGoals(goalsToUpdate);
-      toast.success("Today's activity logged");
+      toast.success(t('mobileHealth.toastActivityLogged'));
       setShowActivityDialog(false);
       setActivityForm({ steps: 0, calories: 0, exerciseMinutes: 0, waterGlasses: 0, sleepHours: 0 });
-    } catch { toast.error('Failed to log activity'); }
+    } catch { toast.error(t('mobileHealth.toastActivityFailed')); }
     finally { setSavingActivity(false); }
   };
 
   const markMedTaken = (id: string) => {
     setMedReminders(prev => prev.map(m => m.id === id ? { ...m, taken: true } : m));
-    toast.success('Marked as taken');
+    toast.success(t('mobileHealth.toastMarkedTaken'));
   };
 
   const vStat = (v?: string) =>
@@ -433,21 +432,21 @@ export const MobileHealth: React.FC = () => {
       {/* ── Header ── */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold">Mobile Health</h2>
-          <p className="text-muted-foreground">Real-time vitals from connected devices, goals and activity</p>
+          <h2 className="text-2xl font-bold">{t('mobileHealth.title')}</h2>
+          <p className="text-muted-foreground">{t('mobileHealth.subtitle')}</p>
         </div>
         <Button variant="outline" onClick={() => setShowActivityDialog(true)}>
-          <Plus className="h-4 w-4 mr-2" /> Log Today's Activity
+          <Plus className="h-4 w-4 mr-2" /> {t('mobileHealth.logActivity')}
         </Button>
       </div>
 
       {/* ── Vitals cards ── */}
       <div className="grid md:grid-cols-4 gap-4">
         {([
-          { key: 'heartRate',        label: 'Heart Rate',     unit: 'bpm',  icon: <Heart       className="h-6 w-6 text-red-600"    />, bg: 'bg-red-100'    },
-          { key: 'bloodPressure',    label: 'Blood Pressure', unit: 'mmHg', icon: <Activity    className="h-6 w-6 text-blue-600"   />, bg: 'bg-blue-100'   },
-          { key: 'temperature',      label: 'Temperature',    unit: '°C',   icon: <Thermometer className="h-6 w-6 text-orange-600" />, bg: 'bg-orange-100' },
-          { key: 'oxygenSaturation', label: 'O₂ Saturation',  unit: 'SpO₂', icon: <Wind        className="h-6 w-6 text-purple-600" />, bg: 'bg-purple-100' },
+          { key: 'heartRate',        label: t('mobileHealth.vitalHeartRate'),     unit: 'bpm',  icon: <Heart       className="h-6 w-6 text-red-600"    />, bg: 'bg-red-100'    },
+          { key: 'bloodPressure',    label: t('mobileHealth.vitalBloodPressure'), unit: 'mmHg', icon: <Activity    className="h-6 w-6 text-blue-600"   />, bg: 'bg-blue-100'   },
+          { key: 'temperature',      label: t('mobileHealth.vitalTemperature'),   unit: '°C',   icon: <Thermometer className="h-6 w-6 text-orange-600" />, bg: 'bg-orange-100' },
+          { key: 'oxygenSaturation', label: t('mobileHealth.vitalOxygen'),        unit: 'SpO₂', icon: <Wind        className="h-6 w-6 text-purple-600" />, bg: 'bg-purple-100' },
         ] as { key: keyof VitalsData; label: string; unit: string; icon: React.ReactNode; bg: string }[]).map(v => (
           <Card key={v.key} className="relative overflow-hidden">
             {liveFields.has(v.key) && (
@@ -472,7 +471,7 @@ export const MobileHealth: React.FC = () => {
 
       <div className="flex justify-end">
         <Button variant="outline" size="sm" onClick={() => { setEditVitals({ ...vitals }); setShowVitalsDialog(true); }}>
-          <Edit2 className="h-4 w-4 mr-2" /> Update Vitals Manually
+          <Edit2 className="h-4 w-4 mr-2" /> {t('mobileHealth.updateVitals')}
         </Button>
       </div>
 
@@ -482,7 +481,7 @@ export const MobileHealth: React.FC = () => {
             <div className="flex gap-3">
               <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
               <p className="text-sm text-amber-800">
-                No vital signs recorded yet. Connect a Bluetooth health device to start automatic tracking, or click <strong>Update Vitals Manually</strong> to add your readings.
+                {t('mobileHealth.noVitalsHint')}
               </p>
             </div>
           </CardContent>
@@ -497,7 +496,7 @@ export const MobileHealth: React.FC = () => {
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2">
                 <Bluetooth className="h-5 w-5 text-blue-600" />
-                Connected Devices
+                {t('mobileHealth.connectedDevices')}
               </CardTitle>
               <Button
                 size="sm"
@@ -505,8 +504,8 @@ export const MobileHealth: React.FC = () => {
                 disabled={scanning}
               >
                 {scanning
-                  ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Scanning…</>
-                  : <><Bluetooth className="h-4 w-4 mr-1" />Scan for Device</>}
+                  ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />{t('mobileHealth.scanning')}</>
+                  : <><Bluetooth className="h-4 w-4 mr-1" />{t('mobileHealth.scanForDevice')}</>}
               </Button>
             </div>
           </CardHeader>
@@ -516,9 +515,9 @@ export const MobileHealth: React.FC = () => {
             {bleDevices.length === 0 ? (
               <div className="border-2 border-dashed border-border rounded-lg p-6 text-center text-muted-foreground">
                 <Bluetooth className="h-10 w-10 mx-auto mb-3 text-muted-foreground/70" />
-                <p className="font-medium text-sm">No devices connected</p>
+                <p className="font-medium text-sm">{t('mobileHealth.noDevicesConnected')}</p>
                 <p className="text-xs mt-1 text-muted-foreground/70">
-                  Click <strong>Scan for Device</strong> to pair a heart rate monitor, blood pressure cuff, thermometer, weight scale, or glucose meter.
+                  {t('mobileHealth.noDevicesHint')}
                 </p>
               </div>
             ) : (
@@ -534,15 +533,15 @@ export const MobileHealth: React.FC = () => {
                           <h4 className="font-semibold text-sm">{device.name}</h4>
                           <div className="flex items-center gap-2 mt-1 flex-wrap">
                             <Badge variant="default" className="text-xs bg-green-600">
-                              <Wifi className="h-3 w-3 mr-1" />Live
+                              <Wifi className="h-3 w-3 mr-1" />{t('mobileHealth.live')}
                             </Badge>
                             {device.battery !== undefined && (
                               <span className={`text-xs font-medium ${batteryColor(device.battery)}`}>
-                                Battery {device.battery}%
+                                {t('mobileHealth.battery', { pct: device.battery })}
                               </span>
                             )}
                             <span className="text-xs text-muted-foreground/70">
-                              Connected {device.connectedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              {t('mobileHealth.connected')} {device.connectedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </span>
                           </div>
 
@@ -589,7 +588,7 @@ export const MobileHealth: React.FC = () => {
                         className="text-red-600 border-red-200 hover:bg-red-50"
                         onClick={() => handleDisconnect(device)}
                       >
-                        <WifiOff className="h-3 w-3 mr-1" />Disconnect
+                        <WifiOff className="h-3 w-3 mr-1" />{t('mobileHealth.disconnect')}
                       </Button>
                     </div>
                   </div>
@@ -611,18 +610,18 @@ export const MobileHealth: React.FC = () => {
                     </svg>
                   </div>
                   <div>
-                    <p className="font-semibold text-sm text-blue-900">Google Fit</p>
+                    <p className="font-semibold text-sm text-blue-900">{t('mobileHealth.googleFitTitle')}</p>
                     <p className="text-xs text-blue-700 mt-0.5">
-                      Import steps, calories, sleep & weight from your Android device or Wear OS watch.
+                      {t('mobileHealth.googleFitDescription')}
                     </p>
                     {fitLastSync && (
                       <p className="text-xs text-blue-500 mt-1">
-                        Last sync: {fitLastSync.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {t('mobileHealth.googleFitLastSync')} {fitLastSync.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </p>
                     )}
                     {!googleFit.isConfigured() && (
                       <p className="text-xs text-amber-700 mt-1">
-                        Set <code className="bg-amber-100 px-1 rounded">VITE_GOOGLE_FIT_CLIENT_ID</code> in <code className="bg-amber-100 px-1 rounded">.env</code> to enable.
+                        Set <code className="bg-amber-100 px-1 rounded">VITE_GOOGLE_FIT_CLIENT_ID</code> in <code className="bg-amber-100 px-1 rounded">.env</code> {t('mobileHealth.googleFitEnvHint')}
                       </p>
                     )}
                   </div>
@@ -635,8 +634,8 @@ export const MobileHealth: React.FC = () => {
                   disabled={fitSyncing}
                 >
                   {fitSyncing
-                    ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" />Syncing…</>
-                    : <><RefreshCw className="h-3 w-3 mr-1" />Sync Now</>}
+                    ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" />{t('mobileHealth.syncing')}</>
+                    : <><RefreshCw className="h-3 w-3 mr-1" />{t('mobileHealth.syncNow')}</>}
                 </Button>
               </div>
             </div>
@@ -645,8 +644,7 @@ export const MobileHealth: React.FC = () => {
             <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted/50 rounded-lg p-3">
               <Zap className="h-3.5 w-3.5 mt-0.5 flex-shrink-0 text-amber-500" />
               <span>
-                <strong>Bluetooth</strong> requires Chrome or Edge on Windows, macOS, or Android.
-                Not supported on iOS/Safari. Devices must use standard Bluetooth GATT health profiles.
+                <strong>Bluetooth</strong> {t('mobileHealth.bluetoothNote')}
               </span>
             </div>
           </CardContent>
@@ -655,7 +653,7 @@ export const MobileHealth: React.FC = () => {
         {/* ── Medication Reminders ── */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Pill className="h-5 w-5" />Medication Reminders</CardTitle>
+            <CardTitle className="flex items-center gap-2"><Pill className="h-5 w-5" />{t('mobileHealth.medReminders')}</CardTitle>
           </CardHeader>
           <CardContent>
             {loadingMeds ? (
@@ -663,7 +661,7 @@ export const MobileHealth: React.FC = () => {
             ) : medReminders.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground/70">
                 <Pill className="h-10 w-10 mx-auto mb-2 opacity-40" />
-                <p className="text-sm">No active prescriptions</p>
+                <p className="text-sm">{t('mobileHealth.noActivePrescriptions')}</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -680,7 +678,7 @@ export const MobileHealth: React.FC = () => {
                       <span className="text-xs text-muted-foreground">{med.frequency}</span>
                       {!med.taken && (
                         <Button size="sm" variant="outline" onClick={() => markMedTaken(med.id)}>
-                          Mark Taken
+                          {t('mobileHealth.markTaken')}
                         </Button>
                       )}
                     </div>
@@ -696,7 +694,7 @@ export const MobileHealth: React.FC = () => {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Weekly Activity</CardTitle>
+            <CardTitle>{t('mobileHealth.weeklyActivity')}</CardTitle>
             {loadingActivity && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground/70" />}
           </div>
         </CardHeader>
@@ -704,8 +702,8 @@ export const MobileHealth: React.FC = () => {
           {!loadingActivity && activityLogs.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground/70">
               <Activity className="h-12 w-12 mx-auto mb-3 opacity-40" />
-              <p className="font-medium">No activity data yet</p>
-              <p className="text-sm mt-1">Log an activity manually, or sync Google Fit to import your smartphone data.</p>
+              <p className="font-medium">{t('mobileHealth.noActivityYet')}</p>
+              <p className="text-sm mt-1">{t('mobileHealth.noActivityHint')}</p>
             </div>
           ) : (
             <div className="h-[280px]">
@@ -729,9 +727,9 @@ export const MobileHealth: React.FC = () => {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2"><Target className="h-5 w-5" />Health Goals</CardTitle>
+            <CardTitle className="flex items-center gap-2"><Target className="h-5 w-5" />{t('mobileHealth.healthGoals')}</CardTitle>
             <Button size="sm" variant="outline" onClick={() => setShowGoalDialog(true)}>
-              <Plus className="h-4 w-4 mr-1" /> Add Goal
+              <Plus className="h-4 w-4 mr-1" /> {t('mobileHealth.addGoal')}
             </Button>
           </div>
         </CardHeader>
@@ -747,7 +745,7 @@ export const MobileHealth: React.FC = () => {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <div className="h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600">
-                          {goalIcon(goal.title)}
+                          {goalIcon(goal.id)}
                         </div>
                         <div>
                           <h4 className="font-medium">{goal.title}</h4>
@@ -764,7 +762,7 @@ export const MobileHealth: React.FC = () => {
                     <Progress value={pct} className="h-2" />
                     {pct >= 100 && (
                       <p className="text-xs text-green-600 flex items-center gap-1">
-                        <CheckCircle className="h-3 w-3" /> Goal achieved!
+                        <CheckCircle className="h-3 w-3" /> {t('mobileHealth.goalAchieved')}
                       </p>
                     )}
                   </div>
@@ -777,19 +775,19 @@ export const MobileHealth: React.FC = () => {
 
       {/* ── Emergency ── */}
       <Card className="bg-red-50 border-red-200">
-        <CardHeader><CardTitle className="text-red-900">Emergency Features</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-red-900">{t('mobileHealth.emergencyTitle')}</CardTitle></CardHeader>
         <CardContent>
           <div className="grid md:grid-cols-2 gap-4">
             <Button
               variant="destructive"
               size="lg"
               className="w-full h-auto py-4"
-              onClick={() => { toast.error('Calling emergency services — 912'); window.open('tel:912'); }}
+              onClick={() => { toast.error(t('mobileHealth.callingEmergency')); window.open('tel:912'); }}
             >
               <div className="text-center">
                 <AlertCircle className="h-8 w-8 mx-auto mb-2" />
-                <p className="font-semibold">Emergency SOS</p>
-                <p className="text-xs opacity-90">Call emergency services (912)</p>
+                <p className="font-semibold">{t('mobileHealth.emergencySOS')}</p>
+                <p className="text-xs opacity-90">{t('mobileHealth.callEmergency')}</p>
               </div>
             </Button>
             <Button
@@ -798,20 +796,20 @@ export const MobileHealth: React.FC = () => {
               className="w-full h-auto py-4"
               onClick={() => {
                 navigator.geolocation?.getCurrentPosition(
-                  pos => toast.success(`Location: ${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`),
-                  () => toast.error('Location access denied'),
+                  pos => toast.success(t('mobileHealth.locationShared', { lat: pos.coords.latitude.toFixed(4), lng: pos.coords.longitude.toFixed(4) })),
+                  () => toast.error(t('mobileHealth.locationDenied')),
                 );
               }}
             >
               <div className="text-center">
                 <Heart className="h-8 w-8 mx-auto mb-2" />
-                <p className="font-semibold">Share Location</p>
-                <p className="text-xs text-muted-foreground">With emergency contacts</p>
+                <p className="font-semibold">{t('mobileHealth.shareLocation')}</p>
+                <p className="text-xs text-muted-foreground">{t('mobileHealth.withContacts')}</p>
               </div>
             </Button>
           </div>
           <div className="mt-4 text-sm text-red-800">
-            <p className="font-medium">Emergency Contacts:</p>
+            <p className="font-medium">{t('mobileHealth.emergencyContacts')}</p>
             <p>Police: 112 &nbsp;|&nbsp; Ambulance: 912 &nbsp;|&nbsp; Hospital: +250 788 123 456</p>
           </div>
         </CardContent>
@@ -823,17 +821,17 @@ export const MobileHealth: React.FC = () => {
       <Dialog open={showVitalsDialog} onOpenChange={setShowVitalsDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Update Vital Signs</DialogTitle>
-            <DialogDescription>Enter your latest readings. Leave blank to keep the current value.</DialogDescription>
+            <DialogTitle>{t('mobileHealth.dialogVitalsTitle')}</DialogTitle>
+            <DialogDescription>{t('mobileHealth.dialogVitalsHint')}</DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-4">
             {([
-              { key: 'heartRate',        label: 'Heart Rate',     placeholder: 'e.g. 72 bpm'   },
-              { key: 'bloodPressure',    label: 'Blood Pressure', placeholder: 'e.g. 120/80'   },
-              { key: 'temperature',      label: 'Temperature',    placeholder: 'e.g. 36.6 °C'  },
-              { key: 'oxygenSaturation', label: 'O₂ Saturation',  placeholder: 'e.g. 98%'      },
-              { key: 'weight',           label: 'Weight',         placeholder: 'e.g. 70 kg'    },
-              { key: 'glucose',          label: 'Blood Glucose',  placeholder: 'e.g. 5.5 mmol' },
+              { key: 'heartRate',        label: t('mobileHealth.fieldHeartRate'),     placeholder: 'e.g. 72 bpm'   },
+              { key: 'bloodPressure',    label: t('mobileHealth.fieldBloodPressure'), placeholder: 'e.g. 120/80'   },
+              { key: 'temperature',      label: t('mobileHealth.fieldTemperature'),   placeholder: 'e.g. 36.6 °C'  },
+              { key: 'oxygenSaturation', label: t('mobileHealth.fieldOxygen'),        placeholder: 'e.g. 98%'      },
+              { key: 'weight',           label: t('mobileHealth.fieldWeight'),        placeholder: 'e.g. 70 kg'    },
+              { key: 'glucose',          label: t('mobileHealth.fieldGlucose'),       placeholder: 'e.g. 5.5 mmol' },
             ] as { key: keyof VitalsData; label: string; placeholder: string }[]).map(f => (
               <div key={f.key} className="space-y-1">
                 <Label className="text-xs">{f.label}</Label>
@@ -846,9 +844,9 @@ export const MobileHealth: React.FC = () => {
             ))}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowVitalsDialog(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setShowVitalsDialog(false)}>{t('common.cancel')}</Button>
             <Button onClick={handleSaveVitals} disabled={savingVitals}>
-              {savingVitals ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving…</> : <><Save className="h-4 w-4 mr-2" />Save Vitals</>}
+              {savingVitals ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />{t('mobileHealth.saving')}</> : <><Save className="h-4 w-4 mr-2" />{t('mobileHealth.saveVitals')}</>}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -858,16 +856,16 @@ export const MobileHealth: React.FC = () => {
       <Dialog open={showActivityDialog} onOpenChange={setShowActivityDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Log Today's Activity</DialogTitle>
-            <DialogDescription>Record your daily health activity. Goals will update automatically.</DialogDescription>
+            <DialogTitle>{t('mobileHealth.dialogActivityTitle')}</DialogTitle>
+            <DialogDescription>{t('mobileHealth.dialogActivityHint')}</DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-4">
             {([
-              { key: 'steps',           label: 'Steps',           placeholder: '0' },
-              { key: 'calories',        label: 'Calories Burned', placeholder: '0' },
-              { key: 'exerciseMinutes', label: 'Exercise (min)',   placeholder: '0' },
-              { key: 'waterGlasses',    label: 'Water (glasses)', placeholder: '0' },
-              { key: 'sleepHours',      label: 'Sleep (hours)',   placeholder: '0' },
+              { key: 'steps',           label: t('mobileHealth.fieldSteps'),    placeholder: '0' },
+              { key: 'calories',        label: t('mobileHealth.fieldCalories'), placeholder: '0' },
+              { key: 'exerciseMinutes', label: t('mobileHealth.fieldExercise'), placeholder: '0' },
+              { key: 'waterGlasses',    label: t('mobileHealth.fieldWater'),    placeholder: '0' },
+              { key: 'sleepHours',      label: t('mobileHealth.fieldSleep'),    placeholder: '0' },
             ] as { key: keyof typeof activityForm; label: string; placeholder: string }[]).map(f => (
               <div key={f.key} className="space-y-1">
                 <Label className="text-xs">{f.label}</Label>
@@ -881,9 +879,9 @@ export const MobileHealth: React.FC = () => {
             ))}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowActivityDialog(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setShowActivityDialog(false)}>{t('common.cancel')}</Button>
             <Button onClick={handleLogActivity} disabled={savingActivity}>
-              {savingActivity ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving…</> : 'Log Activity'}
+              {savingActivity ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />{t('mobileHealth.saving')}</> : t('mobileHealth.logActivityBtn')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -892,25 +890,25 @@ export const MobileHealth: React.FC = () => {
       {/* Add Goal */}
       <Dialog open={showGoalDialog} onOpenChange={setShowGoalDialog}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Add Health Goal</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t('mobileHealth.dialogGoalTitle')}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
-              <Label>Goal Title</Label>
-              <Input placeholder="e.g. Daily Steps" value={newGoal.title} onChange={e => setNewGoal(g => ({ ...g, title: e.target.value }))} />
+              <Label>{t('mobileHealth.goalTitle')}</Label>
+              <Input placeholder={t('mobileHealth.goalTitlePlaceholder')} value={newGoal.title} onChange={e => setNewGoal(g => ({ ...g, title: e.target.value }))} />
             </div>
             <div className="space-y-1">
-              <Label>Target</Label>
-              <Input type="number" min={1} placeholder="e.g. 10000" value={newGoal.target} onChange={e => setNewGoal(g => ({ ...g, target: e.target.value }))} />
+              <Label>{t('mobileHealth.goalTarget')}</Label>
+              <Input type="number" min={1} placeholder={t('mobileHealth.goalTargetPlaceholder')} value={newGoal.target} onChange={e => setNewGoal(g => ({ ...g, target: e.target.value }))} />
             </div>
             <div className="space-y-1">
-              <Label>Unit</Label>
-              <Input placeholder="e.g. steps, glasses, hours, minutes" value={newGoal.unit} onChange={e => setNewGoal(g => ({ ...g, unit: e.target.value }))} />
+              <Label>{t('mobileHealth.goalUnit')}</Label>
+              <Input placeholder={t('mobileHealth.goalUnitPlaceholder')} value={newGoal.unit} onChange={e => setNewGoal(g => ({ ...g, unit: e.target.value }))} />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowGoalDialog(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setShowGoalDialog(false)}>{t('common.cancel')}</Button>
             <Button onClick={handleAddGoal} disabled={savingGoal}>
-              {savingGoal ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving…</> : 'Add Goal'}
+              {savingGoal ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />{t('mobileHealth.saving')}</> : t('mobileHealth.addGoalBtn')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -921,11 +919,11 @@ export const MobileHealth: React.FC = () => {
         <Dialog open={!!showUpdateGoal} onOpenChange={() => setShowUpdateGoal(null)}>
           <DialogContent className="max-w-sm">
             <DialogHeader>
-              <DialogTitle>Update Progress — {showUpdateGoal.title}</DialogTitle>
-              <DialogDescription>Current: {showUpdateGoal.current} / {showUpdateGoal.target} {showUpdateGoal.unit}</DialogDescription>
+              <DialogTitle>{t('mobileHealth.dialogUpdateProgress', { title: showUpdateGoal.title })}</DialogTitle>
+              <DialogDescription>{t('mobileHealth.currentProgress', { current: showUpdateGoal.current, target: showUpdateGoal.target, unit: showUpdateGoal.unit })}</DialogDescription>
             </DialogHeader>
             <div className="space-y-2">
-              <Label>New Current Value ({showUpdateGoal.unit})</Label>
+              <Label>{t('mobileHealth.newCurrentValue', { unit: showUpdateGoal.unit })}</Label>
               <Input
                 type="number" min={0} max={showUpdateGoal.target * 2}
                 defaultValue={showUpdateGoal.current}
@@ -933,11 +931,11 @@ export const MobileHealth: React.FC = () => {
               />
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setShowUpdateGoal(null)}>Cancel</Button>
+              <Button variant="outline" onClick={() => setShowUpdateGoal(null)}>{t('common.cancel')}</Button>
               <Button onClick={() => {
                 const val = Number((document.getElementById('goal-progress-input') as HTMLInputElement).value);
                 handleUpdateGoalProgress(showUpdateGoal, val);
-              }}>Save</Button>
+              }}>{t('common.save')}</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

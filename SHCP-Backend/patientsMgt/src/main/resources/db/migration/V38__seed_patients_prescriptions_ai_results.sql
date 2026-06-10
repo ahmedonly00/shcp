@@ -2,18 +2,18 @@
 --        symptom reports (with AI results), and prescriptions.
 --        Also enriches existing patient's health record and AI results.
 --        All inserts are idempotent (ON CONFLICT DO NOTHING).
---        Test password for all new patients: Patient@1234
+--        Test password for all new patients: Ahmed@123
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 1. New patient users
 -- ─────────────────────────────────────────────────────────────────────────────
 INSERT INTO users (user_id, name, email, phone, role, password_hash, is_verified, language_pref, failed_login_attempts, locked_until)
 VALUES
-  ('a1000001-0000-0000-0000-000000000001', 'Marie Uwimana',         'marie.uwimana@yopmail.com',        '+250788100001', 'PATIENT', '$2b$12$j3pvKw5qfZm8ZodWfqbitubgiz5ASMeURePcIpod97YojNoTQpUgG', true, 'rw', 0, NULL),
-  ('a1000002-0000-0000-0000-000000000002', 'Jean Baptiste Habimana','jean.habimana@yopmail.com',         '+250788100002', 'PATIENT', '$2b$12$j3pvKw5qfZm8ZodWfqbitubgiz5ASMeURePcIpod97YojNoTQpUgG', true, 'en', 0, NULL),
-  ('a1000003-0000-0000-0000-000000000003', 'Consolata Ingabire',    'consolata.ingabire@yopmail.com',    '+250788100003', 'PATIENT', '$2b$12$j3pvKw5qfZm8ZodWfqbitubgiz5ASMeURePcIpod97YojNoTQpUgG', true, 'rw', 0, NULL),
-  ('a1000004-0000-0000-0000-000000000004', 'Emmanuel Nzeyimana',    'emmanuel.nzeyimana@yopmail.com',    '+250788100004', 'PATIENT', '$2b$12$j3pvKw5qfZm8ZodWfqbitubgiz5ASMeURePcIpod97YojNoTQpUgG', true, 'en', 0, NULL),
-  ('a1000005-0000-0000-0000-000000000005', 'Claudine Mukamana',     'claudine.mukamana@yopmail.com',     '+250788100005', 'PATIENT', '$2b$12$j3pvKw5qfZm8ZodWfqbitubgiz5ASMeURePcIpod97YojNoTQpUgG', true, 'rw', 0, NULL)
+  ('a1000001-0000-0000-0000-000000000001', 'Marie Uwimana',         'marie.uwimana@yopmail.com',        '+250788100001', 'PATIENT', '$2a$12$q8RZatVjZxBqAD9i8DyLcuCypXZksofwK7feV97H4AQAAkYweLZ1i', true, 'rw', 0, NULL),
+  ('a1000002-0000-0000-0000-000000000002', 'Jean Baptiste Habimana','jean.habimana@yopmail.com',         '+250788100002', 'PATIENT', '$2a$12$q8RZatVjZxBqAD9i8DyLcuCypXZksofwK7feV97H4AQAAkYweLZ1i', true, 'en', 0, NULL),
+  ('a1000003-0000-0000-0000-000000000003', 'Consolata Ingabire',    'consolata.ingabire@yopmail.com',    '+250788100003', 'PATIENT', '$2a$12$q8RZatVjZxBqAD9i8DyLcuCypXZksofwK7feV97H4AQAAkYweLZ1i', true, 'rw', 0, NULL),
+  ('a1000004-0000-0000-0000-000000000004', 'Emmanuel Nzeyimana',    'emmanuel.nzeyimana@yopmail.com',    '+250788100004', 'PATIENT', '$2a$12$q8RZatVjZxBqAD9i8DyLcuCypXZksofwK7feV97H4AQAAkYweLZ1i', true, 'en', 0, NULL),
+  ('a1000005-0000-0000-0000-000000000005', 'Claudine Mukamana',     'claudine.mukamana@yopmail.com',     '+250788100005', 'PATIENT', '$2a$12$q8RZatVjZxBqAD9i8DyLcuCypXZksofwK7feV97H4AQAAkYweLZ1i', true, 'rw', 0, NULL)
 ON CONFLICT (email) DO NOTHING;
 
 -- ─────────────────────────────────────────────────────────────────────────────

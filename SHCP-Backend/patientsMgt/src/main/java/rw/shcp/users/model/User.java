@@ -32,7 +32,7 @@ public class User implements UserDetails {
     @Column(name = "email", unique = true, nullable = false, length = 150)
     private String email;
 
-    @Column(name = "phone", nullable = true, length = 20)
+    @Column(name = "phone", nullable = true, length = 14)
     private String phone;
 
     @Enumerated(EnumType.STRING)

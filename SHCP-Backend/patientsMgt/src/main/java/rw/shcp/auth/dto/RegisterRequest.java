@@ -24,7 +24,7 @@ public record RegisterRequest(
 
         @JsonProperty("phone")
         @NotBlank(message = "Phone is required")
-        @Pattern(regexp = "^\\+?[0-9]{9,15}$", message = "Invalid phone number")
+        @Pattern(regexp = "^\\+250[0-9]{9,10}$", message = "Phone must be a Rwanda number in the format +250XXXXXXXXX")
         String phone,
 
         @JsonProperty("password")
@@ -48,6 +48,8 @@ public record RegisterRequest(
         @JsonProperty("insuranceNumber")
         String insuranceNumber,
         @JsonProperty("nationalId")
+        @Size(min = 16, max = 16, message = "National ID must be exactly 16 digits")
+        @Pattern(regexp = "^[0-9]{16}$", message = "National ID must be exactly 16 digits")
         String nationalId,
 
         // ── Provider-specific (required when role = PROVIDER) ─

@@ -47,7 +47,7 @@ public class Patient {
     @Column(name = "insurance_number", length = 50)
     private String insuranceNumber;
 
-    @Column(name = "national_id", unique = true, length = 20)
+    @Column(name = "national_id", unique = true, length = 16)
     private String nationalId;
 
     @Column(name = "gender", length = 20)
@@ -56,7 +56,7 @@ public class Patient {
     @Column(name = "emergency_contact_name", length = 100)
     private String emergencyContactName;
 
-    @Column(name = "emergency_contact_phone", length = 20)
+    @Column(name = "emergency_contact_phone", length = 14)
     private String emergencyContactPhone;
 
     @Column(name = "insurance_provider", length = 100)

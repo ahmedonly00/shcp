@@ -21,5 +21,10 @@ public record PlatformStatsDto(
         // ── Clinical ───────────────────────────────────────────────────────
         long totalSymptomReports,
         long totalPrescriptions,
-        long activePrescriptions
+        long activePrescriptions,
+
+        // ── Pharmacy network ───────────────────────────────────────────────
+        long totalPharmacies,
+        long totalPharmacists,
+        long totalBikers
 ) {}

@@ -39,7 +39,7 @@ class AnalyticsControllerTest {
         SecurityContextHelper.mockUser(UUID.randomUUID(), Role.ADMIN);
         AppointmentBreakdownDto appts = AppointmentBreakdownDto.of(1, 2, 0, 10, 1, 0);
         PlatformStatsDto dto = new PlatformStatsDto(
-                100, 20, 3, 18, appts, 75, 70, 22.0, 200, 50, 30);
+                100, 20, 3, 18, appts, 75, 70, 22.0, 200, 50, 30, 6, 6, 6);
         when(analyticsService.platformOverview()).thenReturn(dto);
 
         mockMvc.perform(get("/api/analytics/admin/overview"))

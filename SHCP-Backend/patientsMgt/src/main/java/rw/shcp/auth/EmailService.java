@@ -114,6 +114,34 @@ public class EmailService {
     }
 
     @Async
+    public void sendMohReportPdf(List<String> toEmails, String period, byte[] pdfBytes) {
+        if (toEmails == null || toEmails.isEmpty()) return;
+        try {
+            MimeMessage msg = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(msg, true, "UTF-8");
+            helper.setFrom(fromEmail);
+            helper.setTo(toEmails.toArray(new String[0]));
+            helper.setSubject("SHCP Ministry of Health Report — " + period);
+            helper.setText("""
+                    Dear MOH Team,
+
+                    Please find attached the SHCP platform analytics report for the period: %s.
+
+                    This report includes metrics on consultations, appointments, registrations,
+                    symptom reports, prescriptions, and active providers.
+
+                    — SHCP Health Platform (Automated Report)
+                    """.formatted(period));
+            helper.addAttachment("moh-report-" + period + ".pdf",
+                    new ByteArrayResource(pdfBytes), "application/pdf");
+            mailSender.send(msg);
+            log.info("MOH report PDF email sent to {} recipients for {}", toEmails.size(), period);
+        } catch (MessagingException e) {
+            log.error("Failed to send MOH report PDF email: {}", e.getMessage());
+        }
+    }
+
+    @Async
     public void sendSupportTicketConfirmation(String toEmail, String name,
                                               UUID ticketId, String subject) {
         try {

@@ -13,7 +13,7 @@ public record UpdatePatientRequest(
         String name,
 
         @JsonProperty("phone")
-        @Pattern(regexp = "^\\+?[0-9]{9,15}$", message = "Invalid phone number")
+        @Pattern(regexp = "^\\+250[0-9]{9,10}$", message = "Phone must be a Rwanda number in the format +250XXXXXXXXX")
         String phone,
 
         @JsonProperty("languagePref")
@@ -36,7 +36,8 @@ public record UpdatePatientRequest(
         LocalDate dateOfBirth,
 
         @JsonProperty("nationalId")
-        @Size(max = 20)
+        @Size(min = 16, max = 16, message = "National ID must be exactly 16 digits")
+        @Pattern(regexp = "^[0-9]{16}$", message = "National ID must be exactly 16 digits")
         String nationalId,
 
         @JsonProperty("gender")
@@ -49,7 +50,7 @@ public record UpdatePatientRequest(
         String emergencyContactName,
 
         @JsonProperty("emergencyContactPhone")
-        @Pattern(regexp = "^(\\+?[0-9]{9,15})?$", message = "Invalid emergency contact phone")
+        @Pattern(regexp = "^(\\+250[0-9]{9,10})?$", message = "Emergency contact phone must be a Rwanda number in the format +250XXXXXXXXX")
         String emergencyContactPhone,
 
         @JsonProperty("insuranceProvider")

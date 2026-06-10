@@ -10,6 +10,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import rw.shcp.analytics.dto.*;
+import rw.shcp.auth.EmailService;
 import rw.shcp.common.enums.ConsultationStatus;
 import rw.shcp.common.enums.Role;
 import rw.shcp.consultations.Consultation;
@@ -46,6 +47,7 @@ public class AnalyticsService {
         private final ConsultationRepository consultationRepository;
         private final PrescriptionRepository prescriptionRepository;
         private final SymptomReportRepository symptomReportRepository;
+        private final EmailService emailService;
         private final ObjectMapper objectMapper;
 
         // ── Admin: platform overview ──────────────────────────────────────────────
@@ -71,7 +73,10 @@ public class AnalyticsService {
                                 round(analyticsRepository.avgConsultationDurationMinutes()),
                                 analyticsRepository.countAllSymptomReports(),
                                 analyticsRepository.countAllPrescriptions(),
-                                analyticsRepository.countActivePrescriptions());
+                                analyticsRepository.countActivePrescriptions(),
+                                analyticsRepository.countActivePharmacies(),
+                                userRepository.countByRole(Role.PHARMACIST),
+                                userRepository.countByRole(Role.BIKER));
         }
 
         // ── Admin: time-series ────────────────────────────────────────────────────
@@ -497,6 +502,40 @@ public class AnalyticsService {
                 cfg.setSchedule(dto.schedule());
                 cfg.setEnabled(dto.enabled());
                 return toConfigDto(reportConfigRepository.save(cfg));
+        }
+
+        @PreAuthorize("hasRole('ADMIN')")
+        @Transactional
+        public void sendReportNow(LocalDate from, LocalDate to, List<String> metrics) {
+                MohReportConfig cfg = reportConfigRepository.findFirstByOrderByCreatedAtAsc().orElse(null);
+                List<String> emails = List.of();
+                try {
+                        if (cfg != null) emails = objectMapper.readValue(cfg.getRecipientEmails(), new TypeReference<>() {});
+                } catch (Exception ignored) {}
+                if (emails.isEmpty()) throw new IllegalStateException("No recipient emails configured for MOH report delivery");
+                byte[] csv  = exportReportCsv(from, to, metrics);
+                byte[] xlsx = exportReportExcel(from, to, metrics);
+                emailService.sendMohReport(emails, from + " to " + to, csv, xlsx);
+                if (cfg != null) {
+                        cfg.setLastSentAt(OffsetDateTime.now());
+                        reportConfigRepository.save(cfg);
+                }
+        }
+
+        @PreAuthorize("hasRole('ADMIN')")
+        @Transactional
+        public void sendReportPdfNow(LocalDate from, LocalDate to, byte[] pdfBytes) {
+                MohReportConfig cfg = reportConfigRepository.findFirstByOrderByCreatedAtAsc().orElse(null);
+                List<String> emails = List.of();
+                try {
+                        if (cfg != null) emails = objectMapper.readValue(cfg.getRecipientEmails(), new TypeReference<>() {});
+                } catch (Exception ignored) {}
+                if (emails.isEmpty()) throw new IllegalStateException("No recipient emails configured for MOH report delivery");
+                emailService.sendMohReportPdf(emails, from + " to " + to, pdfBytes);
+                if (cfg != null) {
+                        cfg.setLastSentAt(OffsetDateTime.now());
+                        reportConfigRepository.save(cfg);
+                }
         }
 
         public void triggerScheduledReport(LocalDate from, LocalDate to) {

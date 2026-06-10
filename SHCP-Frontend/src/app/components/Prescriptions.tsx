@@ -10,6 +10,7 @@ import {
   Calendar, User, ChevronDown, ChevronUp, XCircle, Bell,
   RefreshCw, Clock, CheckCircle2, Truck, AlertCircle, Navigation
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/app/context/AuthContext';
 import { prescriptionsApi } from '@/app/api/prescriptions';
 import { ApiPrescriptionDto } from '@/app/types';
@@ -30,25 +31,17 @@ interface Medication {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-const STATUS_META: Record<RxStatus, { label: string; color: string }> = {
-  PENDING:              { label: 'Pending',          color: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
-  PROCESSING:           { label: 'Processing',       color: 'bg-blue-100 text-blue-800 border-blue-300' },
-  READY_FOR_DELIVERY:   { label: 'Ready at Pharmacy', color: 'bg-indigo-100 text-indigo-800 border-indigo-300' },
-  PICKED_UP:            { label: 'Picked Up',        color: 'bg-cyan-100 text-cyan-800 border-cyan-300' },
-  ON_THE_WAY:           { label: 'On the Way',       color: 'bg-purple-100 text-purple-800 border-purple-300' },
-  DELIVERED:            { label: 'Delivered',        color: 'bg-green-100 text-green-800 border-green-300' },
-  FAILED:               { label: 'Failed',           color: 'bg-red-100 text-red-800 border-red-300' },
-  CANCELLED:            { label: 'Cancelled',        color: 'bg-gray-100 text-gray-600 border-gray-300' },
-  EXPIRED:              { label: 'Expired',          color: 'bg-gray-100 text-gray-500 border-gray-300' },
+const STATUS_COLORS: Record<RxStatus, string> = {
+  PENDING:              'bg-yellow-100 text-yellow-800 border-yellow-300',
+  PROCESSING:           'bg-blue-100 text-blue-800 border-blue-300',
+  READY_FOR_DELIVERY:   'bg-indigo-100 text-indigo-800 border-indigo-300',
+  PICKED_UP:            'bg-cyan-100 text-cyan-800 border-cyan-300',
+  ON_THE_WAY:           'bg-purple-100 text-purple-800 border-purple-300',
+  DELIVERED:            'bg-green-100 text-green-800 border-green-300',
+  FAILED:               'bg-red-100 text-red-800 border-red-300',
+  CANCELLED:            'bg-gray-100 text-gray-600 border-gray-300',
+  EXPIRED:              'bg-gray-100 text-gray-500 border-gray-300',
 };
-
-const FILTER_TABS: { key: FilterKey; label: string; icon: React.ReactNode }[] = [
-  { key: 'all',       label: 'All',        icon: <FileText className="h-3.5 w-3.5" /> },
-  { key: 'active',    label: 'Active',     icon: <Clock className="h-3.5 w-3.5" /> },
-  { key: 'transit',   label: 'In Transit', icon: <Truck className="h-3.5 w-3.5" /> },
-  { key: 'delivered', label: 'Delivered',  icon: <CheckCircle2 className="h-3.5 w-3.5" /> },
-  { key: 'closed',    label: 'Closed',     icon: <XCircle className="h-3.5 w-3.5" /> },
-];
 
 const ACTIVE_STATUSES:    RxStatus[] = ['PENDING', 'PROCESSING', 'READY_FOR_DELIVERY'];
 const TRANSIT_STATUSES:   RxStatus[] = ['PICKED_UP', 'ON_THE_WAY'];
@@ -83,9 +76,24 @@ interface RxCardProps {
 }
 
 function RxCard({ rx, isProvider, onCancel, onNotifyPharmacy, onDownload, downloading, cancelling, notifying, onNavigateToDashboard }: RxCardProps) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const meds = parseMeds(rx.medications);
-  const meta = STATUS_META[rx.status] ?? STATUS_META.PENDING;
+
+  const STATUS_LABELS: Record<RxStatus, string> = {
+    PENDING:            t('prescriptions.statusPending'),
+    PROCESSING:         t('prescriptions.statusProcessing'),
+    READY_FOR_DELIVERY: t('prescriptions.statusReadyAtPharmacy'),
+    PICKED_UP:          t('prescriptions.statusPickedUp'),
+    ON_THE_WAY:         t('prescriptions.statusOnTheWay'),
+    DELIVERED:          t('prescriptions.statusDelivered'),
+    FAILED:             t('prescriptions.statusFailed'),
+    CANCELLED:          t('prescriptions.statusCancelled'),
+    EXPIRED:            t('prescriptions.statusExpired'),
+  };
+
+  const color = STATUS_COLORS[rx.status] ?? STATUS_COLORS.PENDING;
+  const label = STATUS_LABELS[rx.status] ?? STATUS_LABELS.PENDING;
   const canCancel = isProvider && ['PENDING', 'PROCESSING'].includes(rx.status);
   const canNotify = isProvider && rx.pharmacyId && ['PENDING', 'PROCESSING', 'READY_FOR_DELIVERY'].includes(rx.status);
 
@@ -105,8 +113,8 @@ function RxCard({ rx, isProvider, onCancel, onNotifyPharmacy, onDownload, downlo
               <p className="font-medium text-sm truncate">
                 {isProvider ? rx.patientName : `Dr. ${rx.providerName}`}
               </p>
-              <Badge className={`text-xs px-2 py-0 border ${meta.color}`}>
-                {meta.label}
+              <Badge className={`text-xs px-2 py-0 border ${color}`}>
+                {label}
               </Badge>
             </div>
             <div className="flex items-center gap-3 mt-0.5 flex-wrap">
@@ -115,7 +123,7 @@ function RxCard({ rx, isProvider, onCancel, onNotifyPharmacy, onDownload, downlo
                 {rx.issuedAt.split('T')[0]}
               </span>
               <span className="text-xs text-muted-foreground">
-                {meds.length} medication{meds.length !== 1 ? 's' : ''}
+                {t('prescriptions.medicationCount', { count: meds.length })}
               </span>
               {rx.pharmacyName && (
                 <span className="text-xs text-muted-foreground flex items-center gap-1">
@@ -135,13 +143,13 @@ function RxCard({ rx, isProvider, onCancel, onNotifyPharmacy, onDownload, downlo
         <div className="border-t px-4 pb-4 pt-3 space-y-4 bg-gray-50/50">
           {/* Medications */}
           <div>
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Medications</p>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">{t('prescriptions.medications')}</p>
             <div className="space-y-2">
               {meds.map((med, i) => (
                 <div key={i} className="bg-white rounded-lg border p-3 text-sm">
                   <p className="font-medium text-gray-800">{med.name}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    {[med.dosage, med.frequency, med.durationDays ? `${med.durationDays} days` : null]
+                    {[med.dosage, med.frequency, med.durationDays ? t('prescriptions.durationDays', { count: med.durationDays }) : null]
                       .filter(Boolean).join(' · ')}
                   </p>
                 </div>
@@ -152,7 +160,7 @@ function RxCard({ rx, isProvider, onCancel, onNotifyPharmacy, onDownload, downlo
           {/* Instructions */}
           {rx.instructions && (
             <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Instructions</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">{t('prescriptions.instructions')}</p>
               <p className="text-sm text-gray-700 italic">{rx.instructions}</p>
             </div>
           )}
@@ -160,12 +168,12 @@ function RxCard({ rx, isProvider, onCancel, onNotifyPharmacy, onDownload, downlo
           {/* Validity & delivery */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
             <div className="bg-white rounded-lg border p-3">
-              <p className="text-xs text-muted-foreground mb-0.5">Valid Until</p>
+              <p className="text-xs text-muted-foreground mb-0.5">{t('prescriptions.validUntil')}</p>
               <p className="font-medium">{rx.validUntil.split('T')[0]}</p>
             </div>
             {(rx.deliveryDistrict || rx.deliveryAddress) && (
               <div className="bg-white rounded-lg border p-3">
-                <p className="text-xs text-muted-foreground mb-0.5">Delivery Address</p>
+                <p className="text-xs text-muted-foreground mb-0.5">{t('prescriptions.deliveryAddress')}</p>
                 <p className="font-medium text-xs leading-relaxed">
                   {[rx.deliveryCell, rx.deliverySector, rx.deliveryDistrict, rx.deliveryAddress]
                     .filter(Boolean).join(', ')}
@@ -184,7 +192,7 @@ function RxCard({ rx, isProvider, onCancel, onNotifyPharmacy, onDownload, downlo
               disabled={downloading}
             >
               {downloading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-              Download PDF
+              {t('prescriptions.downloadPdf')}
             </Button>
 
             {!isProvider && (rx.status === 'PICKED_UP' || rx.status === 'ON_THE_WAY') && onNavigateToDashboard && (
@@ -194,7 +202,7 @@ function RxCard({ rx, isProvider, onCancel, onNotifyPharmacy, onDownload, downlo
                 onClick={onNavigateToDashboard}
               >
                 <Navigation className="h-3.5 w-3.5" />
-                Track Live
+                {t('prescriptions.trackLive')}
               </Button>
             )}
 
@@ -207,7 +215,7 @@ function RxCard({ rx, isProvider, onCancel, onNotifyPharmacy, onDownload, downlo
                 disabled={notifying}
               >
                 {notifying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Bell className="h-3.5 w-3.5" />}
-                Notify Pharmacy
+                {t('prescriptions.notifyPharmacy')}
               </Button>
             )}
 
@@ -220,7 +228,7 @@ function RxCard({ rx, isProvider, onCancel, onNotifyPharmacy, onDownload, downlo
                 disabled={cancelling}
               >
                 {cancelling ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <XCircle className="h-3.5 w-3.5" />}
-                Cancel
+                {t('prescriptions.cancel')}
               </Button>
             )}
           </div>
@@ -233,8 +241,17 @@ function RxCard({ rx, isProvider, onCancel, onNotifyPharmacy, onDownload, downlo
 // ── Main Component ───────────────────────────────────────────────────────────
 
 export function Prescriptions({ onNavigateToDashboard }: { onNavigateToDashboard?: () => void } = {}) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const isProvider = user?.role === 'doctor';
+
+  const FILTER_TABS: { key: FilterKey; label: string; icon: React.ReactNode }[] = [
+    { key: 'all',       label: t('prescriptions.filterAll'),       icon: <FileText className="h-3.5 w-3.5" /> },
+    { key: 'active',    label: t('prescriptions.filterActive'),    icon: <Clock className="h-3.5 w-3.5" /> },
+    { key: 'transit',   label: t('prescriptions.filterTransit'),   icon: <Truck className="h-3.5 w-3.5" /> },
+    { key: 'delivered', label: t('prescriptions.filterDelivered'), icon: <CheckCircle2 className="h-3.5 w-3.5" /> },
+    { key: 'closed',    label: t('prescriptions.filterClosed'),    icon: <XCircle className="h-3.5 w-3.5" /> },
+  ];
 
   const [prescriptions, setPrescriptions] = useState<ApiPrescriptionDto[]>([]);
   const [loading, setLoading]             = useState(false);
@@ -250,11 +267,11 @@ export function Prescriptions({ onNavigateToDashboard }: { onNavigateToDashboard
       const list = await prescriptionsApi.getMine();
       setPrescriptions(list ?? []);
     } catch {
-      toast.error('Could not load prescriptions');
+      toast.error(t('prescriptions.toastLoadFailed'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -263,7 +280,7 @@ export function Prescriptions({ onNavigateToDashboard }: { onNavigateToDashboard
     try {
       await downloadPrescriptionPdf(rx);
     } catch {
-      toast.error('Could not generate PDF — please try again');
+      toast.error(t('prescriptions.toastPdfFailed'));
     } finally {
       setDownloadingId(null);
     }
@@ -274,9 +291,9 @@ export function Prescriptions({ onNavigateToDashboard }: { onNavigateToDashboard
     try {
       const updated = await prescriptionsApi.cancel(id);
       setPrescriptions(prev => prev.map(p => p.prescriptionId === id ? updated : p));
-      toast.success('Prescription cancelled');
+      toast.success(t('prescriptions.toastCancelled'));
     } catch {
-      toast.error('Could not cancel prescription');
+      toast.error(t('prescriptions.toastCancelFailed'));
     } finally {
       setCancellingId(null);
     }
@@ -286,9 +303,9 @@ export function Prescriptions({ onNavigateToDashboard }: { onNavigateToDashboard
     setNotifyingId(id);
     try {
       await prescriptionsApi.notifyPharmacy(id);
-      toast.success('Pharmacy notified');
+      toast.success(t('prescriptions.toastPharmacyNotified'));
     } catch {
-      toast.error('Could not notify pharmacy');
+      toast.error(t('prescriptions.toastNotifyFailed'));
     } finally {
       setNotifyingId(null);
     }
@@ -321,34 +338,34 @@ export function Prescriptions({ onNavigateToDashboard }: { onNavigateToDashboard
       {/* Page header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Prescriptions</h2>
+          <h2 className="text-2xl font-bold tracking-tight">{t('prescriptions.title')}</h2>
           <p className="text-muted-foreground text-sm mt-0.5">
             {isProvider
-              ? 'All prescriptions you have issued'
-              : 'Your prescriptions from consultations'}
+              ? t('prescriptions.subtitleProvider')
+              : t('prescriptions.subtitlePatient')}
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={load} disabled={loading} className="gap-1.5">
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-          Refresh
+          {t('prescriptions.refresh')}
         </Button>
       </div>
 
       {/* Summary stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: 'Total',     value: counts.all,       icon: <FileText className="h-4 w-4 text-gray-500" />,        bg: 'bg-gray-50' },
-          { label: 'Active',    value: counts.active,    icon: <Clock className="h-4 w-4 text-yellow-500" />,         bg: 'bg-yellow-50' },
-          { label: 'In Transit',value: counts.transit,   icon: <Truck className="h-4 w-4 text-purple-500" />,         bg: 'bg-purple-50' },
-          { label: 'Delivered', value: counts.delivered, icon: <CheckCircle2 className="h-4 w-4 text-green-500" />,   bg: 'bg-green-50' },
+          { key: 'all' as FilterKey,       label: t('prescriptions.statTotal'),     icon: <FileText className="h-4 w-4 text-gray-500" />,        bg: 'bg-gray-50' },
+          { key: 'active' as FilterKey,    label: t('prescriptions.statActive'),    icon: <Clock className="h-4 w-4 text-yellow-500" />,         bg: 'bg-yellow-50' },
+          { key: 'transit' as FilterKey,   label: t('prescriptions.statInTransit'), icon: <Truck className="h-4 w-4 text-purple-500" />,         bg: 'bg-purple-50' },
+          { key: 'delivered' as FilterKey, label: t('prescriptions.statDelivered'), icon: <CheckCircle2 className="h-4 w-4 text-green-500" />,   bg: 'bg-green-50' },
         ].map(s => (
-          <Card key={s.label} className={`${s.bg} border-0`}>
+          <Card key={s.key} className={`${s.bg} border-0`}>
             <CardContent className="pt-4 pb-3">
               <div className="flex items-center gap-2">
                 {s.icon}
                 <p className="text-xs text-muted-foreground">{s.label}</p>
               </div>
-              <p className="text-2xl font-bold mt-1">{s.value}</p>
+              <p className="text-2xl font-bold mt-1">{counts[s.key]}</p>
             </CardContent>
           </Card>
         ))}
@@ -361,7 +378,7 @@ export function Prescriptions({ onNavigateToDashboard }: { onNavigateToDashboard
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder={isProvider ? 'Search by patient, medication…' : 'Search by doctor, medication…'}
+              placeholder={isProvider ? t('prescriptions.searchProvider') : t('prescriptions.searchPatient')}
               value={search}
               onChange={e => setSearch(e.target.value)}
               className="pl-9"
@@ -405,12 +422,12 @@ export function Prescriptions({ onNavigateToDashboard }: { onNavigateToDashboard
               <Pill className="h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-30" />
               <p className="font-medium text-muted-foreground">
                 {prescriptions.length === 0
-                  ? (isProvider ? 'You have not issued any prescriptions yet' : 'No prescriptions found')
-                  : 'No prescriptions match your filter'}
+                  ? (isProvider ? t('prescriptions.emptyNoIssued') : t('prescriptions.emptyNoFound'))
+                  : t('prescriptions.emptyNoMatch')}
               </p>
               {prescriptions.length > 0 && q && (
                 <Button variant="ghost" size="sm" className="mt-3" onClick={() => setSearch('')}>
-                  Clear search
+                  {t('prescriptions.clearSearch')}
                 </Button>
               )}
             </CardContent>

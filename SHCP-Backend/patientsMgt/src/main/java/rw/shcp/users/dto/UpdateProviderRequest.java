@@ -11,7 +11,7 @@ public record UpdateProviderRequest(
         String name,
 
         @JsonProperty("phone")
-        @Pattern(regexp = "^\\+?[0-9]{9,15}$", message = "Invalid phone number")
+        @Pattern(regexp = "^\\+250[0-9]{9,10}$", message = "Phone must be a Rwanda number in the format +250XXXXXXXXX")
         String phone,
 
         @JsonProperty("languagePref")

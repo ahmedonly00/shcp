@@ -417,6 +417,8 @@ export const Profile: React.FC = () => {
                   <Input
                     id="phone"
                     type="tel"
+                    placeholder="+250788123456"
+                    maxLength={14}
                     value={formData.phone}
                     onChange={(e) => handleChange('phone', e.target.value)}
                     disabled={!isEditing}
@@ -528,6 +530,8 @@ export const Profile: React.FC = () => {
                     <Input
                       id="emergencyPhone"
                       type="tel"
+                      placeholder="+250788123456"
+                      maxLength={14}
                       value={formData.emergencyContactPhone}
                       onChange={(e) => handleChange('emergencyContactPhone', e.target.value)}
                       disabled={!isEditing}
@@ -779,8 +783,12 @@ export const Profile: React.FC = () => {
                   <Label htmlFor="nationalId">National ID</Label>
                   <Input
                     id="nationalId"
+                    placeholder="16-digit national ID"
+                    inputMode="numeric"
+                    minLength={16}
+                    maxLength={16}
                     value={formData.nationalId}
-                    onChange={(e) => handleChange('nationalId', e.target.value)}
+                    onChange={(e) => handleChange('nationalId', e.target.value.replace(/\D/g, '').slice(0, 16))}
                     disabled={!isEditing}
                   />
                 </div>

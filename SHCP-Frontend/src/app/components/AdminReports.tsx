@@ -1,44 +1,49 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select';
-import { FileText, Download, Loader2, Mail, RefreshCw, AlertCircle } from 'lucide-react';
+import { FileText, Download, Loader2, Mail, RefreshCw, AlertCircle, Send } from 'lucide-react';
 import { analyticsApi, ReportData, ScheduledReportConfig, AdminConsultationRow } from '@/app/api/analytics';
-import { downloadMohReportPdf } from '@/app/lib/downloadReportPdf';
+import { downloadMohReportPdf, generateMohReportPdfBytes } from '@/app/lib/downloadReportPdf';
 import { useAuth } from '@/app/context/AuthContext';
 import { toast } from 'sonner';
 
-const ALL_METRICS = [
-  { key: 'consultations',  label: 'Consultations' },
-  { key: 'appointments',   label: 'Appointments' },
-  { key: 'registrations',  label: 'Registrations' },
-  { key: 'symptoms',       label: 'Symptom Reports' },
-  { key: 'prescriptions',  label: 'Prescriptions' },
-  { key: 'providers',      label: 'Providers' },
-];
+const METRIC_KEYS = ['consultations', 'appointments', 'registrations', 'symptoms', 'prescriptions', 'providers'] as const;
 
 export const AdminReports: React.FC = () => {
+  const { t } = useTranslation();
   const { user } = useAuth();
+
+  const ALL_METRICS = [
+    { key: 'consultations',  label: t('adminReports.metricConsultations') },
+    { key: 'appointments',   label: t('adminReports.metricAppointments') },
+    { key: 'registrations',  label: t('adminReports.metricRegistrations') },
+    { key: 'symptoms',       label: t('adminReports.metricSymptoms') },
+    { key: 'prescriptions',  label: t('adminReports.metricPrescriptions') },
+    { key: 'providers',      label: t('adminReports.metricProviders') },
+  ];
 
   const defaultFrom = `${new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10)}T00:00`;
   const defaultTo   = `${new Date().toISOString().slice(0, 10)}T23:59`;
 
   const [reportFrom,       setReportFrom]       = useState(defaultFrom);
   const [reportTo,         setReportTo]         = useState(defaultTo);
-  const [selectedMetrics,  setSelectedMetrics]  = useState<string[]>(ALL_METRICS.map(m => m.key));
+  const [selectedMetrics,  setSelectedMetrics]  = useState<string[]>([...METRIC_KEYS]);
   const [reportData,        setReportData]        = useState<ReportData | null>(null);
   const [consultationRows,  setConsultationRows]  = useState<AdminConsultationRow[]>([]);
   const [loadingReport,     setLoadingReport]     = useState(false);
   const [exportingReport,   setExportingReport]   = useState<'csv' | 'xlsx' | 'pdf' | null>(null);
 
   const [scheduledConfig,  setScheduledConfig]  = useState<ScheduledReportConfig>({
-    recipientEmails: [], schedule: 'WEEKLY', metrics: ALL_METRICS.map(m => m.key), enabled: false,
+    recipientEmails: [], schedule: 'WEEKLY', metrics: [...METRIC_KEYS], enabled: false,
   });
   const [recipientsInput,  setRecipientsInput]  = useState('');
   const [savingConfig,     setSavingConfig]     = useState(false);
   const [loadingConfig,    setLoadingConfig]    = useState(false);
+  const [sendingNow,       setSendingNow]       = useState(false);
 
   const fromDate = reportFrom.slice(0, 10);
   const toDate   = reportTo.slice(0, 10);
@@ -55,8 +60,8 @@ export const AdminReports: React.FC = () => {
   }, []);
 
   const handleGenerateReport = async () => {
-    if (!fromDate || !toDate) { toast.error('Select a date range'); return; }
-    if (fromDate > toDate)    { toast.error('Start date must be before end date'); return; }
+    if (!fromDate || !toDate) { toast.error(t('adminReports.toastSelectRange')); return; }
+    if (fromDate > toDate)    { toast.error(t('adminReports.toastStartBeforeEnd')); return; }
     setLoadingReport(true);
     setReportData(null);
     setConsultationRows([]);
@@ -66,26 +71,57 @@ export const AdminReports: React.FC = () => {
         analyticsApi.adminConsultationSummary(fromDate, toDate),
       ]);
       if (data.status === 'fulfilled')  setReportData(data.value);
-      else                              toast.error('Failed to generate report');
+      else                              toast.error(t('adminReports.toastFailedReport'));
       if (rows.status === 'fulfilled')  setConsultationRows(rows.value ?? []);
     } catch {
-      toast.error('Failed to generate report');
+      toast.error(t('adminReports.toastFailedReport'));
     } finally {
       setLoadingReport(false);
     }
   };
 
   const handleExportReport = async (format: 'csv' | 'xlsx' | 'pdf') => {
-    if (!fromDate || !toDate || !reportData) { toast.error('Generate a report first'); return; }
+    if (!fromDate || !toDate || !reportData) { toast.error(t('adminReports.toastGenerateFirst')); return; }
     setExportingReport(format);
     try {
       if (format === 'csv')       await analyticsApi.exportMohReportCsv(fromDate, toDate, selectedMetrics);
       else if (format === 'xlsx') await analyticsApi.exportMohReportExcel(fromDate, toDate, selectedMetrics);
       else                        await downloadMohReportPdf(reportData, user?.name ?? 'Administrator', consultationRows);
     } catch {
-      toast.error('Export failed');
+      toast.error(t('adminReports.toastExportFailed'));
     } finally {
       setExportingReport(null);
+    }
+  };
+
+  const handleSendNow = async () => {
+    if (!fromDate || !toDate) { toast.error(t('adminReports.toastSelectRangeFirst')); return; }
+    const emails = recipientsInput.split(/[,\n]+/).map(e => e.trim()).filter(Boolean);
+    if (emails.length === 0) { toast.error(t('adminReports.toastAddRecipient')); return; }
+    setSendingNow(true);
+    try {
+      await analyticsApi.saveScheduledConfig({ ...scheduledConfig, recipientEmails: emails });
+
+      let data = reportData;
+      let rows = consultationRows;
+      if (!data) {
+        const [reportResult, rowsResult] = await Promise.allSettled([
+          analyticsApi.getMohReport(fromDate, toDate, selectedMetrics),
+          analyticsApi.adminConsultationSummary(fromDate, toDate),
+        ]);
+        if (reportResult.status === 'fulfilled') { data = reportResult.value; setReportData(data); }
+        else throw new Error('Failed to load report data');
+        if (rowsResult.status === 'fulfilled') { rows = rowsResult.value ?? []; setConsultationRows(rows); }
+      }
+
+      const pdfBytes = await generateMohReportPdfBytes(data!, user?.name ?? 'Administrator', rows);
+      await analyticsApi.sendMohReportPdf(fromDate, toDate, selectedMetrics, pdfBytes);
+      toast.success(t('adminReports.toastReportSent', { count: emails.length }));
+      setScheduledConfig(prev => ({ ...prev, lastSentAt: new Date().toISOString(), recipientEmails: emails }));
+    } catch {
+      toast.error(t('adminReports.toastFailedSend'));
+    } finally {
+      setSendingNow(false);
     }
   };
 
@@ -96,9 +132,9 @@ export const AdminReports: React.FC = () => {
       const saved = await analyticsApi.saveScheduledConfig({ ...scheduledConfig, recipientEmails: emails });
       setScheduledConfig(saved);
       setRecipientsInput(saved.recipientEmails.join(', '));
-      toast.success('Scheduled report configuration saved');
+      toast.success(t('adminReports.toastConfigSaved'));
     } catch {
-      toast.error('Failed to save configuration');
+      toast.error(t('adminReports.toastFailedConfig'));
     } finally {
       setSavingConfig(false);
     }
@@ -107,8 +143,8 @@ export const AdminReports: React.FC = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold">Reports</h2>
-        <p className="text-muted-foreground">Generate and export Ministry of Health platform reports.</p>
+        <h2 className="text-2xl font-bold">{t('adminReports.title')}</h2>
+        <p className="text-muted-foreground">{t('adminReports.subtitle')}</p>
       </div>
 
       {/* ── Report Configuration ──────────────────────────────────────────── */}
@@ -116,22 +152,22 @@ export const AdminReports: React.FC = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
-            Report Configuration
+            {t('adminReports.reportConfig')}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Quick presets */}
           <div className="space-y-2">
-            <Label>Quick Range</Label>
+            <Label>{t('adminReports.quickRange')}</Label>
             <div className="flex flex-wrap gap-2">
               {[
-                { label: 'Today',        days: 0 },
-                { label: 'Last 7 days',  days: 7 },
-                { label: 'Last 30 days', days: 30 },
-                { label: 'Last 90 days', days: 90 },
-                { label: 'This year',    days: -1 },
-              ].map(({ label, days }) => (
-                <button key={label} type="button"
+                { labelKey: 'common.today',              days: 0 },
+                { labelKey: 'adminReports.last7Days',    days: 7 },
+                { labelKey: 'adminReports.last30Days',   days: 30 },
+                { labelKey: 'adminReports.last90Days',   days: 90 },
+                { labelKey: 'adminReports.thisYear',     days: -1 },
+              ].map(({ labelKey, days }) => (
+                <button key={labelKey} type="button"
                   onClick={() => {
                     const now = new Date();
                     const toVal = `${now.toISOString().slice(0, 10)}T23:59`;
@@ -145,7 +181,7 @@ export const AdminReports: React.FC = () => {
                   }}
                   className="px-3 py-1.5 rounded-full text-xs font-medium border border-border bg-background hover:bg-muted transition-colors"
                 >
-                  {label}
+                  {t(labelKey)}
                 </button>
               ))}
             </div>
@@ -154,23 +190,23 @@ export const AdminReports: React.FC = () => {
           {/* Custom datetime range */}
           <div className="grid md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>From</Label>
+              <Label>{t('analytics.from')}</Label>
               <Input type="datetime-local" value={reportFrom} onChange={e => setReportFrom(e.target.value)} />
             </div>
             <div className="space-y-2">
-              <Label>To</Label>
+              <Label>{t('analytics.to')}</Label>
               <Input type="datetime-local" value={reportTo} onChange={e => setReportTo(e.target.value)} />
             </div>
           </div>
           {fromDate && toDate && fromDate > toDate && (
             <p className="text-xs text-red-600 flex items-center gap-1">
-              <AlertCircle className="h-3.5 w-3.5" /> Start date must be before end date
+              <AlertCircle className="h-3.5 w-3.5" /> {t('adminReports.dateError')}
             </p>
           )}
 
           {/* Metrics */}
           <div className="space-y-2">
-            <Label>Metrics to Include</Label>
+            <Label>{t('adminReports.metricsToInclude')}</Label>
             <div className="flex flex-wrap gap-2">
               {ALL_METRICS.map(({ key, label }) => (
                 <button key={key} type="button" onClick={() => toggleMetric(key)}
@@ -187,8 +223,8 @@ export const AdminReports: React.FC = () => {
 
           <Button onClick={handleGenerateReport} disabled={loadingReport}>
             {loadingReport
-              ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Generating…</>
-              : <><RefreshCw className="h-4 w-4 mr-2" />Generate Preview</>}
+              ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />{t('adminReports.generating')}</>
+              : <><RefreshCw className="h-4 w-4 mr-2" />{t('adminReports.generatePreview')}</>}
           </Button>
         </CardContent>
       </Card>
@@ -198,7 +234,7 @@ export const AdminReports: React.FC = () => {
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle>Report Preview</CardTitle>
+              <CardTitle>{t('adminReports.reportPreview')}</CardTitle>
               {reportData && (
                 <div className="flex gap-2">
                   {(['csv', 'xlsx', 'pdf'] as const).map(fmt => (
@@ -226,46 +262,48 @@ export const AdminReports: React.FC = () => {
                 <div className="rounded-lg border bg-muted/30 px-4 py-3 space-y-1 text-sm">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="text-muted-foreground">
-                      Period: <strong className="text-foreground">
+                      {t('adminReports.period')} <strong className="text-foreground">
                         {new Date(reportFrom).toLocaleString('en-RW', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                      </strong> to <strong className="text-foreground">
+                      </strong> {t('adminReports.periodTo')} <strong className="text-foreground">
                         {new Date(reportTo).toLocaleString('en-RW', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                       </strong>
                     </span>
                     <span className="text-xs text-muted-foreground italic">
-                      Generated on {new Date().toLocaleString('en-RW', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })} by <strong>{user?.name ?? 'Administrator'}</strong>
+                      {t('adminReports.generatedOn')} {new Date().toLocaleString('en-RW', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })} {t('adminReports.generatedBy')} <strong>{user?.name ?? 'Administrator'}</strong>
                     </span>
                   </div>
                 </div>
 
                 {/* Summary table */}
                 <div>
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Summary Metrics</p>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">{t('adminReports.summaryMetrics')}</p>
                   <table className="w-full text-sm border-collapse rounded-lg overflow-hidden">
                     <thead>
                       <tr className="bg-primary text-primary-foreground">
-                        <th className="text-left px-4 py-2.5 font-semibold">Metric</th>
-                        <th className="text-right px-4 py-2.5 font-semibold">Value</th>
+                        <th className="text-left px-4 py-2.5 font-semibold">{t('adminReports.colMetric')}</th>
+                        <th className="text-right px-4 py-2.5 font-semibold">{t('adminReports.colValue')}</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {[
-                        ['Total Consultations',             reportData.totalConsultations],
-                        ['Completed Consultations',         reportData.completedConsultations],
-                        ['Avg Consultation Duration (min)', reportData.avgConsultationDurationMinutes],
-                        ['Total Appointments',              reportData.totalAppointments],
-                        ['Completed Appointments',          reportData.completedAppointments],
-                        ['Cancelled Appointments',          reportData.cancelledAppointments],
-                        ['New Patient Registrations',       reportData.newPatients],
-                        ['New Provider Registrations',      reportData.newProviders],
-                        ['Symptom Reports',                 reportData.totalSymptomReports],
-                        ['Prescriptions Issued',            reportData.totalPrescriptions],
-                        ['Active Prescriptions',            reportData.activePrescriptions],
-                        ['Active Providers',                reportData.activeProviders],
-                        ['Total Providers',                 reportData.totalProviders],
-                      ].filter(([, v]) => v != null).map(([label, value], i) => (
+                      {(
+                        [
+                          [t('adminReports.rowTotalConsultations'),             reportData.totalConsultations],
+                          [t('adminReports.rowCompletedConsultations'),         reportData.completedConsultations],
+                          [t('adminReports.rowAvgDuration'),                    reportData.avgConsultationDurationMinutes],
+                          [t('adminReports.rowTotalAppointments'),              reportData.totalAppointments],
+                          [t('adminReports.rowCompletedAppointments'),          reportData.completedAppointments],
+                          [t('adminReports.rowCancelledAppointments'),          reportData.cancelledAppointments],
+                          [t('adminReports.rowNewPatients'),                    reportData.newPatients],
+                          [t('adminReports.rowNewProviders'),                   reportData.newProviders],
+                          [t('adminReports.rowSymptomReports'),                 reportData.totalSymptomReports],
+                          [t('adminReports.rowPrescriptionsIssued'),            reportData.totalPrescriptions],
+                          [t('adminReports.rowActivePrescriptions'),            reportData.activePrescriptions],
+                          [t('adminReports.rowActiveProviders'),                reportData.activeProviders],
+                          [t('adminReports.rowTotalProviders'),                 reportData.totalProviders],
+                        ] as [string, number | undefined | null][]
+                      ).filter(([, v]) => v != null).map(([label, value], i) => (
                         <tr key={i} className={i % 2 === 0 ? 'bg-muted/40' : 'bg-background'}>
-                          <td className="px-4 py-2.5 border-b text-foreground">{label as string}</td>
+                          <td className="px-4 py-2.5 border-b text-foreground">{label}</td>
                           <td className="px-4 py-2.5 border-b text-right font-semibold">
                             {typeof value === 'number' && !Number.isInteger(value)
                               ? (value as number).toFixed(1)
@@ -281,14 +319,14 @@ export const AdminReports: React.FC = () => {
                 {reportData.dailyAppointments?.length > 0 && (
                   <div>
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                      Daily Appointments ({reportData.dailyAppointments.length} days)
+                      {t('adminReports.dailyAppointments', { count: reportData.dailyAppointments.length })}
                     </p>
                     <div className="max-h-56 overflow-y-auto rounded-lg border">
                       <table className="w-full text-sm border-collapse">
                         <thead className="sticky top-0">
                           <tr className="bg-primary text-primary-foreground">
-                            <th className="text-left px-4 py-2 font-semibold">Date</th>
-                            <th className="text-right px-4 py-2 font-semibold">Appointments</th>
+                            <th className="text-left px-4 py-2 font-semibold">{t('adminReports.colDate')}</th>
+                            <th className="text-right px-4 py-2 font-semibold">{t('adminReports.colAppointments')}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -308,14 +346,14 @@ export const AdminReports: React.FC = () => {
                 {reportData.dailyRegistrations?.length > 0 && (
                   <div>
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                      Daily Registrations ({reportData.dailyRegistrations.length} days)
+                      {t('adminReports.dailyRegistrations', { count: reportData.dailyRegistrations.length })}
                     </p>
                     <div className="max-h-56 overflow-y-auto rounded-lg border">
                       <table className="w-full text-sm border-collapse">
                         <thead className="sticky top-0">
                           <tr className="bg-primary text-primary-foreground">
-                            <th className="text-left px-4 py-2 font-semibold">Date</th>
-                            <th className="text-right px-4 py-2 font-semibold">New Users</th>
+                            <th className="text-left px-4 py-2 font-semibold">{t('adminReports.colDate')}</th>
+                            <th className="text-right px-4 py-2 font-semibold">{t('adminReports.colNewUsers')}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -335,20 +373,20 @@ export const AdminReports: React.FC = () => {
                 {consultationRows.length > 0 && (
                   <div>
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                      Provider Consultations — {consultationRows.length} record{consultationRows.length !== 1 ? 's' : ''}
+                      {t('adminReports.providerConsultations', { count: consultationRows.length })}
                     </p>
                     <div className="overflow-x-auto rounded-lg border max-h-96 overflow-y-auto">
                       <table className="w-full text-sm border-collapse">
                         <thead className="sticky top-0">
                           <tr className="bg-primary text-primary-foreground">
                             <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">#</th>
-                            <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">Provider</th>
-                            <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">Patient</th>
-                            <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">Diagnosis</th>
-                            <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">Medications</th>
-                            <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">Urgency</th>
-                            <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">Date & Time</th>
-                            <th className="text-right px-3 py-2.5 font-semibold whitespace-nowrap">Duration</th>
+                            <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">{t('adminReports.colProvider')}</th>
+                            <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">{t('adminReports.colPatient')}</th>
+                            <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">{t('adminReports.colDiagnosis')}</th>
+                            <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">{t('adminReports.colMedications')}</th>
+                            <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">{t('adminReports.colUrgency')}</th>
+                            <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">{t('adminReports.colDateTime')}</th>
+                            <th className="text-right px-3 py-2.5 font-semibold whitespace-nowrap">{t('adminReports.colDuration')}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -365,7 +403,7 @@ export const AdminReports: React.FC = () => {
                                 <td className="px-3 py-2 border-b font-medium whitespace-nowrap">Dr. {row.providerName}</td>
                                 <td className="px-3 py-2 border-b whitespace-nowrap">{row.patientName}</td>
                                 <td className="px-3 py-2 border-b text-muted-foreground max-w-[140px] truncate" title={row.diagnosis ?? ''}>{row.diagnosis ?? '—'}</td>
-                                <td className="px-3 py-2 border-b text-muted-foreground max-w-[160px] truncate" title={row.medications ?? ''}>{row.medications ?? 'None prescribed'}</td>
+                                <td className="px-3 py-2 border-b text-muted-foreground max-w-[160px] truncate" title={row.medications ?? ''}>{row.medications ?? t('adminReports.nonePrescribed')}</td>
                                 <td className="px-3 py-2 border-b">
                                   <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${urgencyColor}`}>
                                     {row.urgencyLevel ?? 'UNKNOWN'}
@@ -399,7 +437,7 @@ export const AdminReports: React.FC = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Mail className="h-5 w-5" />
-            Scheduled Delivery to MOH
+            {t('adminReports.scheduledDelivery')}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -415,23 +453,25 @@ export const AdminReports: React.FC = () => {
                   className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${scheduledConfig.enabled ? 'bg-primary' : 'bg-border'}`}>
                   <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${scheduledConfig.enabled ? 'translate-x-6' : 'translate-x-1'}`} />
                 </button>
-                <span className="text-sm font-medium">{scheduledConfig.enabled ? 'Enabled' : 'Disabled'}</span>
+                <span className="text-sm font-medium">
+                  {scheduledConfig.enabled ? t('adminReports.enabled') : t('adminReports.disabled')}
+                </span>
               </div>
 
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Schedule</Label>
+                  <Label>{t('adminReports.scheduleLabel')}</Label>
                   <Select value={scheduledConfig.schedule}
                     onValueChange={v => setScheduledConfig(p => ({ ...p, schedule: v as 'WEEKLY' | 'MONTHLY' }))}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="WEEKLY">Weekly (every Monday)</SelectItem>
-                      <SelectItem value="MONTHLY">Monthly (1st of month)</SelectItem>
+                      <SelectItem value="WEEKLY">{t('adminReports.weeklySchedule')}</SelectItem>
+                      <SelectItem value="MONTHLY">{t('adminReports.monthlySchedule')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Metrics in report</Label>
+                  <Label>{t('adminReports.metricsInReport')}</Label>
                   <div className="flex flex-wrap gap-1">
                     {ALL_METRICS.map(({ key, label }) => (
                       <button key={key} type="button"
@@ -452,22 +492,31 @@ export const AdminReports: React.FC = () => {
               </div>
 
               <div className="space-y-2">
-                <Label>Recipient Emails (comma-separated)</Label>
+                <Label>{t('adminReports.recipientEmails')}</Label>
                 <Input placeholder="moh@gov.rw, stats@minisante.gov.rw"
                   value={recipientsInput} onChange={e => setRecipientsInput(e.target.value)} />
-                <p className="text-xs text-muted-foreground">Reports are sent automatically as CSV + Excel attachments.</p>
+                <p className="text-xs text-muted-foreground">{t('adminReports.emailHint')}</p>
               </div>
 
               {scheduledConfig.lastSentAt && (
                 <p className="text-xs text-muted-foreground">
-                  Last sent: {new Date(scheduledConfig.lastSentAt).toLocaleString()}
+                  {t('adminReports.lastSent')} {new Date(scheduledConfig.lastSentAt).toLocaleString()}
                 </p>
               )}
 
-              <Button onClick={handleSaveScheduledConfig} disabled={savingConfig}>
-                {savingConfig ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Mail className="h-4 w-4 mr-2" />}
-                Save Configuration
-              </Button>
+              <div className="flex flex-wrap gap-3 items-center">
+                <Button onClick={handleSaveScheduledConfig} disabled={savingConfig || sendingNow} variant="outline">
+                  {savingConfig ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Mail className="h-4 w-4 mr-2" />}
+                  {t('adminReports.saveConfig')}
+                </Button>
+                <Button onClick={handleSendNow} disabled={sendingNow || savingConfig}>
+                  {sendingNow ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
+                  {t('adminReports.sendNow')}
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  {t('adminReports.sendNowHint')}
+                </p>
+              </div>
             </>
           )}
         </CardContent>

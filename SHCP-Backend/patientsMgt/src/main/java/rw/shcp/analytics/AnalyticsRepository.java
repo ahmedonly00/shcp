@@ -277,4 +277,9 @@ public interface AnalyticsRepository extends Repository<Appointment, UUID> {
 
     @Query("SELECT COUNT(p) FROM Prescription p")
     long countAllPrescriptions();
+
+    // ── Pharmacy network counts ────────────────────────────────────────────────
+
+    @Query(value = "SELECT COUNT(*) FROM pharmacies WHERE is_active = TRUE", nativeQuery = true)
+    long countActivePharmacies();
 }

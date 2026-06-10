@@ -14,6 +14,7 @@ import rw.shcp.notifications.NotificationEvent;
 import rw.shcp.notifications.NotificationPublisher;
 import rw.shcp.pharmacy.dto.AddPharmacistRequest;
 import rw.shcp.pharmacy.dto.CreatePharmacyRequest;
+import rw.shcp.pharmacy.dto.NearestPharmacyDto;
 import rw.shcp.pharmacy.dto.PharmacistProfileDto;
 import rw.shcp.pharmacy.dto.PharmacyDto;
 import rw.shcp.users.model.User;
@@ -213,6 +214,42 @@ public class PharmacyService {
         return resolveNearest(district, sector, cell, deliveryLat, deliveryLon, medNames, null);
     }
 
+    /**
+     * Returns the top {@code limit} active pharmacies ranked by proximity to the
+     * given delivery location.  Used by providers when composing a prescription so
+     * they can see which pharmacy is closest to the patient before issuing.
+     *
+     * <p>Ranking key (priority order):
+     * <ol>
+     *   <li>Admin-area match level: CELL &gt; SECTOR &gt; DISTRICT &gt; OTHER</li>
+     *   <li>Haversine distance (km) ascending — only when GPS coordinates are supplied</li>
+     *   <li>Pharmacy name (alphabetical) as a stable tiebreaker</li>
+     * </ol>
+     */
+    public List<NearestPharmacyDto> findNearest(
+            String district, String sector, String cell,
+            Double lat, Double lng, int limit) {
+
+        List<Pharmacy> all = pharmacyRepository.findAllByIsActiveTrue();
+
+        return all.stream()
+                .map(p -> {
+                    String level = computeMatchLevel(p, district, sector, cell);
+                    Double dist  = (lat != null && lng != null
+                            && p.getLatitude() != null && p.getLongitude() != null)
+                            ? HaversineUtils.distanceKm(lat, lng, p.getLatitude(), p.getLongitude())
+                            : null;
+                    return NearestPharmacyDto.from(p, dist, level);
+                })
+                .sorted(Comparator
+                        .<NearestPharmacyDto>comparingInt(d -> matchScore(d.matchLevel()))
+                        .reversed()
+                        .thenComparingDouble(d -> d.distanceKm() != null ? d.distanceKm() : Double.MAX_VALUE)
+                        .thenComparing(NearestPharmacyDto::name))
+                .limit(Math.min(limit, 10))
+                .toList();
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
 
     /**
@@ -307,5 +344,23 @@ public class PharmacyService {
 
     private static boolean hasValue(String s) {
         return s != null && !s.isBlank();
+    }
+
+    private String computeMatchLevel(Pharmacy p, String district, String sector, String cell) {
+        if (!hasValue(district) || !district.equalsIgnoreCase(p.getDistrict())) return "OTHER";
+        if (hasValue(sector) && sector.equalsIgnoreCase(p.getSector())) {
+            if (hasValue(cell) && cell.equalsIgnoreCase(p.getCell())) return "CELL";
+            return "SECTOR";
+        }
+        return "DISTRICT";
+    }
+
+    private int matchScore(String level) {
+        return switch (level) {
+            case "CELL"     -> 4;
+            case "SECTOR"   -> 3;
+            case "DISTRICT" -> 2;
+            default         -> 1;
+        };
     }
 }

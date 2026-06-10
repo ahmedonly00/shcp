@@ -16,7 +16,7 @@ public record RegisterBikerRequest(
         String email,
 
         @JsonProperty("phone")
-        @NotBlank @Pattern(regexp = "^\\+?[0-9]{9,15}$")
+        @NotBlank @Pattern(regexp = "^\\+250[0-9]{9,10}$", message = "Phone must be a Rwanda number in the format +250XXXXXXXXX")
         String phone,
 
         @JsonProperty("licenseNumber")

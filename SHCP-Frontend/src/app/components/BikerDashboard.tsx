@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/app/components/ui/button";
 import { Card, CardContent } from "@/app/components/ui/card";
 import { Badge } from "@/app/components/ui/badge";
@@ -61,6 +62,7 @@ function DestinationCard({
   lat: number | null;
   lng: number | null;
 }) {
+  const { t } = useTranslation();
   const watchRef = useRef<number | null>(null);
   const lastSentRef = useRef<number>(0);
   const INTERVAL_MS = 20_000; // push every 20 s
@@ -78,14 +80,14 @@ function DestinationCard({
       },
       (err) => {
         if (err.code !== err.PERMISSION_DENIED) return; // ignore temporary errors
-        toast.error("Location permission denied. Enable GPS to share your position.");
+        toast.error(t('bikerDashboard.toastLocationPermission'));
       },
       { enableHighAccuracy: true, timeout: 15_000, maximumAge: 10_000 },
     );
     return () => {
       if (watchRef.current !== null) navigator.geolocation.clearWatch(watchRef.current);
     };
-  }, [deliveryId]);
+  }, [deliveryId, t]);
 
   const mapsUrl = lat != null && lng != null
     ? `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`
@@ -97,8 +99,8 @@ function DestinationCard({
         <div className="flex items-start gap-2">
           <MapPin className="h-4 w-4 text-primary mt-0.5 shrink-0" />
           <div>
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Delivery Destination</p>
-            <p className="text-sm text-foreground mt-0.5">{address ?? "Address not set"}</p>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('bikerDashboard.deliveryDestination')}</p>
+            <p className="text-sm text-foreground mt-0.5">{address ?? t('bikerDashboard.addressNotSet')}</p>
           </div>
         </div>
         {mapsUrl && (
@@ -108,22 +110,22 @@ function DestinationCard({
             rel="noopener noreferrer"
             className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary text-white text-xs font-medium rounded-lg hover:bg-primary/90 transition-colors"
           >
-            <Navigation className="h-3.5 w-3.5" /> Navigate
+            <Navigation className="h-3.5 w-3.5" /> {t('bikerDashboard.navigate')}
           </a>
         )}
       </div>
 
       {lat != null && lng != null ? (
-        <OsmMap lat={lat} lng={lng} label="Patient location on map" />
+        <OsmMap lat={lat} lng={lng} label={t('bikerDashboard.patientLocationOnMap')} />
       ) : (
         <div className="rounded-lg border border-dashed border-border h-24 flex items-center justify-center text-xs text-muted-foreground/70">
-          No GPS coordinates for this delivery
+          {t('bikerDashboard.noGpsCoordinates')}
         </div>
       )}
 
       <div className="flex items-center gap-1.5 text-xs text-muted-foreground/70">
         <Locate className="h-3.5 w-3.5" />
-        <span>Your GPS is being shared with the patient every 20 s while this delivery is active.</span>
+        <span>{t('bikerDashboard.gpsBeingShared')}</span>
       </div>
     </div>
   );
@@ -132,6 +134,7 @@ function DestinationCard({
 // ── Active order workflow card ─────────────────────────────────────────────────
 
 function ActiveOrderCard({ order, onRefresh }: { order: api.DeliveryDto; onRefresh: () => void }) {
+  const { t } = useTranslation();
   const [failureDialogOpen, setFailureDialogOpen] = useState(false);
   const [deliverDialogOpen, setDeliverDialogOpen] = useState(false);
   const [failureReason, setFailureReason] = useState("");
@@ -156,7 +159,7 @@ function ActiveOrderCard({ order, onRefresh }: { order: api.DeliveryDto; onRefre
       <CardContent className="p-5 space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="font-semibold text-foreground">Active Delivery</h3>
+            <h3 className="font-semibold text-foreground">{t('bikerDashboard.activeDelivery')}</h3>
             <p className="text-xs text-muted-foreground/70">ID: {order.deliveryId.slice(0, 8)}…</p>
           </div>
           <StatusBadge status={order.status} />
@@ -168,14 +171,14 @@ function ActiveOrderCard({ order, onRefresh }: { order: api.DeliveryDto; onRefre
               className="flex-1 bg-primary hover:bg-primary/90 text-white"
               onClick={() => handle(() => api.acceptOrder(order.deliveryId))}
             >
-              <CheckCircle className="h-4 w-4 mr-1.5" /> Accept
+              <CheckCircle className="h-4 w-4 mr-1.5" /> {t('bikerDashboard.accept')}
             </Button>
             <Button
               variant="outline"
               className="flex-1 border-red-400 text-red-500"
               onClick={() => handle(() => api.declineOrder(order.deliveryId))}
             >
-              <XCircle className="h-4 w-4 mr-1.5" /> Decline
+              <XCircle className="h-4 w-4 mr-1.5" /> {t('bikerDashboard.decline')}
             </Button>
           </div>
         )}
@@ -185,7 +188,7 @@ function ActiveOrderCard({ order, onRefresh }: { order: api.DeliveryDto; onRefre
             className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
             onClick={() => handle(() => api.markPickedUp(order.deliveryId))}
           >
-            <Bike className="h-4 w-4 mr-1.5" /> Mark Picked Up
+            <Bike className="h-4 w-4 mr-1.5" /> {t('bikerDashboard.markPickedUp')}
           </Button>
         )}
 
@@ -194,7 +197,7 @@ function ActiveOrderCard({ order, onRefresh }: { order: api.DeliveryDto; onRefre
             className="w-full bg-cyan-600 hover:bg-cyan-700 text-white"
             onClick={() => handle(() => api.markOnTheWay(order.deliveryId))}
           >
-            <MapPin className="h-4 w-4 mr-1.5" /> Mark On The Way
+            <MapPin className="h-4 w-4 mr-1.5" /> {t('bikerDashboard.markOnTheWay')}
           </Button>
         )}
 
@@ -204,14 +207,14 @@ function ActiveOrderCard({ order, onRefresh }: { order: api.DeliveryDto; onRefre
               className="flex-1 bg-green-600 hover:bg-green-700 text-white"
               onClick={() => setDeliverDialogOpen(true)}
             >
-              <CheckCircle className="h-4 w-4 mr-1.5" /> Mark Delivered
+              <CheckCircle className="h-4 w-4 mr-1.5" /> {t('bikerDashboard.markDelivered')}
             </Button>
             <Button
               variant="outline"
               className="flex-1 border-red-400 text-red-500"
               onClick={() => setFailureDialogOpen(true)}
             >
-              <XCircle className="h-4 w-4 mr-1.5" /> Mark Failed
+              <XCircle className="h-4 w-4 mr-1.5" /> {t('bikerDashboard.markFailed')}
             </Button>
           </div>
         )}
@@ -229,14 +232,14 @@ function ActiveOrderCard({ order, onRefresh }: { order: api.DeliveryDto; onRefre
         {/* Delivered dialog with optional photo */}
         <Dialog open={deliverDialogOpen} onOpenChange={setDeliverDialogOpen}>
           <DialogContent>
-            <DialogHeader><DialogTitle>Confirm Delivery</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{t('bikerDashboard.confirmDelivery')}</DialogTitle></DialogHeader>
             <div className="space-y-3 py-2">
-              <Label>Confirmation Photo (optional)</Label>
+              <Label>{t('bikerDashboard.confirmationPhotoOptional')}</Label>
               <input type="file" accept="image/*" ref={fileRef} className="hidden"
                      onChange={e => setPhoto(e.target.files?.[0] ?? null)} />
               <Button variant="outline" className="w-full" onClick={() => fileRef.current?.click()}>
                 <Camera className="h-4 w-4 mr-2" />
-                {photo ? photo.name : "Attach Photo"}
+                {photo ? photo.name : t('bikerDashboard.attachPhoto')}
               </Button>
               <Button
                 className="w-full bg-green-600 hover:bg-green-700 text-white"
@@ -245,7 +248,7 @@ function ActiveOrderCard({ order, onRefresh }: { order: api.DeliveryDto; onRefre
                     .then(() => setDeliverDialogOpen(false));
                 }}
               >
-                Confirm Delivered
+                {t('bikerDashboard.confirmDelivered')}
               </Button>
             </div>
           </DialogContent>
@@ -254,11 +257,11 @@ function ActiveOrderCard({ order, onRefresh }: { order: api.DeliveryDto; onRefre
         {/* Failure dialog */}
         <Dialog open={failureDialogOpen} onOpenChange={setFailureDialogOpen}>
           <DialogContent>
-            <DialogHeader><DialogTitle>Report Delivery Failure</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{t('bikerDashboard.reportDeliveryFailure')}</DialogTitle></DialogHeader>
             <div className="space-y-3 py-2">
-              <Label>Reason for failure</Label>
+              <Label>{t('bikerDashboard.reasonForFailure')}</Label>
               <Textarea
-                placeholder="e.g. Patient not reachable, address incorrect…"
+                placeholder={t('bikerDashboard.failurePlaceholder')}
                 value={failureReason}
                 onChange={e => setFailureReason(e.target.value)}
                 rows={3}
@@ -271,7 +274,7 @@ function ActiveOrderCard({ order, onRefresh }: { order: api.DeliveryDto; onRefre
                     .then(() => { setFailureDialogOpen(false); setFailureReason(""); });
                 }}
               >
-                Submit Failure Report
+                {t('bikerDashboard.submitFailureReport')}
               </Button>
             </div>
           </DialogContent>
@@ -284,6 +287,7 @@ function ActiveOrderCard({ order, onRefresh }: { order: api.DeliveryDto; onRefre
 // ── Main Component ─────────────────────────────────────────────────────────────
 
 export const BikerDashboard: React.FC = () => {
+  const { t } = useTranslation();
   const [profile, setProfile] = useState<api.BikerDto | null>(null);
   const [orders, setOrders] = useState<api.DeliveryDto[]>([]);
   const [loading, setLoading] = useState(true);
@@ -292,7 +296,7 @@ export const BikerDashboard: React.FC = () => {
     setLoading(true);
     Promise.all([api.getMyBikerProfile(), api.getMyOrders()])
       .then(([p, o]) => { setProfile(p); setOrders(o); })
-      .catch(() => toast.error("Failed to load dashboard"))
+      .catch(() => toast.error(t('bikerDashboard.toastFailedLoad')))
       .finally(() => setLoading(false));
   };
 
@@ -308,20 +312,20 @@ export const BikerDashboard: React.FC = () => {
     try {
       const updated = await api.updateBikerStatus(next);
       setProfile(updated);
-      toast.success(`Status set to ${updated.status}`);
-    } catch { toast.error("Failed to update status"); }
+      toast.success(t('bikerDashboard.toastStatusSet', { status: updated.status }));
+    } catch { toast.error(t('bikerDashboard.toastFailedStatus')); }
   };
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-[300px] text-muted-foreground">Loading your dashboard…</div>;
+    return <div className="flex items-center justify-center min-h-[300px] text-muted-foreground">{t('bikerDashboard.loadingDashboard')}</div>;
   }
 
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-primary">Biker Dashboard</h2>
-          <p className="text-muted-foreground text-sm mt-1">View your deliveries and update status.</p>
+          <h2 className="text-2xl font-bold text-primary">{t('bikerDashboard.title')}</h2>
+          <p className="text-muted-foreground text-sm mt-1">{t('bikerDashboard.subtitle')}</p>
         </div>
         <div className="flex items-center gap-3">
           {profile && (
@@ -335,7 +339,11 @@ export const BikerDashboard: React.FC = () => {
               onClick={toggleStatus}
               disabled={profile.status === "ON_DELIVERY"}
             >
-              {profile.status === "OFFLINE" ? "Go Available" : profile.status === "ON_DELIVERY" ? "On Delivery" : "Go Offline"}
+              {profile.status === "OFFLINE"
+                ? t('bikerDashboard.goAvailable')
+                : profile.status === "ON_DELIVERY"
+                  ? t('bikerDashboard.onDelivery')
+                  : t('bikerDashboard.goOffline')}
             </Button>
           )}
           <Button variant="outline" size="sm" onClick={load}>
@@ -352,7 +360,7 @@ export const BikerDashboard: React.FC = () => {
           </div>
           <div className="flex-1">
             <p className="font-semibold text-foreground">{profile.name}</p>
-            <p className="text-sm text-muted-foreground">{profile.vehicleType} · {profile.operatingZone ?? "All zones"}</p>
+            <p className="text-sm text-muted-foreground">{profile.vehicleType} · {profile.operatingZone ?? t('bikerDashboard.allZones')}</p>
           </div>
           <Badge
             className={
@@ -369,7 +377,7 @@ export const BikerDashboard: React.FC = () => {
       {/* Active orders */}
       {activeOrders.length > 0 && (
         <div className="space-y-3">
-          <h3 className="font-semibold text-foreground/80">Active Orders</h3>
+          <h3 className="font-semibold text-foreground/80">{t('bikerDashboard.activeOrders')}</h3>
           {activeOrders.map(o => (
             <ActiveOrderCard key={o.deliveryId} order={o} onRefresh={load} />
           ))}
@@ -378,9 +386,9 @@ export const BikerDashboard: React.FC = () => {
 
       {/* History */}
       <div className="space-y-3">
-        <h3 className="font-semibold text-foreground/80">Order History</h3>
+        <h3 className="font-semibold text-foreground/80">{t('bikerDashboard.orderHistory')}</h3>
         {historyOrders.length === 0 ? (
-          <p className="text-sm text-muted-foreground/70 py-4 text-center">No completed deliveries yet.</p>
+          <p className="text-sm text-muted-foreground/70 py-4 text-center">{t('bikerDashboard.noDeliveries')}</p>
         ) : (
           <div className="space-y-2">
             {historyOrders.map(o => (
@@ -389,9 +397,9 @@ export const BikerDashboard: React.FC = () => {
                   <div>
                     <p className="text-xs text-muted-foreground/70">
                       {o.deliveredAt
-                        ? `Delivered: ${new Date(o.deliveredAt).toLocaleDateString()}`
+                        ? `${t('bikerDashboard.delivered')}: ${new Date(o.deliveredAt).toLocaleDateString()}`
                         : o.assignedAt
-                          ? `Assigned: ${new Date(o.assignedAt).toLocaleDateString()}`
+                          ? `${t('bikerDashboard.assigned')}: ${new Date(o.assignedAt).toLocaleDateString()}`
                           : ""}
                     </p>
                     {o.failureReason && (

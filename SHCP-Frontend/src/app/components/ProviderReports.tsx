@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
 import { Label } from '@/app/components/ui/label';
@@ -15,6 +16,7 @@ import { toast } from 'sonner';
 interface PatientOption { id: string; name: string; }
 
 export const ProviderReports: React.FC = () => {
+  const { t } = useTranslation();
   const { user } = useAuth();
 
   // ── Consultation Summary Report ───────────────────────────────────────────
@@ -51,24 +53,24 @@ export const ProviderReports: React.FC = () => {
   const handleGenerateReport = async () => {
     const from = reportFrom.slice(0, 10);
     const to   = reportTo.slice(0, 10);
-    if (!from || !to || from > to) { toast.error('Select a valid date range'); return; }
+    if (!from || !to || from > to) { toast.error(t('providerReports.invalidDateRange')); return; }
     setLoadingReport(true);
     setReportGenerated(false);
     try {
       const rows = await analyticsApi.providerConsultationSummary(from, to, reportFilter);
       setConsultationRows(rows ?? []);
       setReportGenerated(true);
-      if ((rows ?? []).length === 0) toast.info('No completed consultations found in this date range.');
+      if ((rows ?? []).length === 0) toast.info(t('providerReports.noConsultationsRange'));
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      toast.error(msg ?? 'Failed to generate report');
+      toast.error(msg ?? t('providerReports.failedReport'));
     } finally {
       setLoadingReport(false);
     }
   };
 
   const handleExportReport = async () => {
-    if (!stats) { toast.error('Stats not loaded yet'); return; }
+    if (!stats) { toast.error(t('providerReports.statsNotLoaded')); return; }
     setExportingReport(true);
     try {
       await downloadProviderReportPdf(
@@ -78,14 +80,14 @@ export const ProviderReports: React.FC = () => {
       );
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      toast.error(`PDF export failed: ${msg}`);
+      toast.error(t('providerReports.pdfExportFailed', { msg }));
     } finally {
       setExportingReport(false);
     }
   };
 
   const handleGenerateCheckUpReport = async () => {
-    if (!checkUpPatientId) { toast.error('Please select a patient'); return; }
+    if (!checkUpPatientId) { toast.error(t('providerReports.selectPatientFirst')); return; }
     setGeneratingCheckUp(true);
     try {
       const [patientData, ehrData, symptomData] = await Promise.allSettled([
@@ -94,7 +96,7 @@ export const ProviderReports: React.FC = () => {
         providersApi.getPatientLatestSymptomReport(checkUpPatientId),
       ]);
       if (patientData.status === 'rejected' || ehrData.status === 'rejected') {
-        toast.error('Could not load patient data'); return;
+        toast.error(t('providerReports.couldNotLoadPatient')); return;
       }
       await downloadPatientCheckUpPdf({
         patient:       patientData.value,
@@ -105,10 +107,10 @@ export const ProviderReports: React.FC = () => {
         nextSteps,
         reportDate:    new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' }),
       });
-      toast.success('Check-up report downloaded');
+      toast.success(t('providerReports.checkUpDownloaded'));
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      toast.error(`Failed to generate report: ${msg}`);
+      toast.error(t('providerReports.failedCheckUp', { msg }));
     } finally {
       setGeneratingCheckUp(false);
     }
@@ -117,8 +119,8 @@ export const ProviderReports: React.FC = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold">Reports</h2>
-        <p className="text-muted-foreground">Generate consultation summaries and patient check-up reports.</p>
+        <h2 className="text-2xl font-bold">{t('providerReports.title')}</h2>
+        <p className="text-muted-foreground">{t('providerReports.subtitle')}</p>
       </div>
 
       {/* ── Patient Consultation Report ───────────────────────────────────── */}
@@ -127,7 +129,7 @@ export const ProviderReports: React.FC = () => {
           <div className="flex items-center justify-between flex-wrap gap-3">
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              Patient Consultation Report
+              {t('providerReports.consultationReport')}
             </CardTitle>
             <Button
               variant="outline" size="sm"
@@ -136,36 +138,36 @@ export const ProviderReports: React.FC = () => {
               className="gap-1.5"
             >
               {exportingReport ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-              Export PDF
+              {t('providerReports.exportPdf')}
             </Button>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid sm:grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">From</label>
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{t('analytics.from')}</label>
               <input type="datetime-local" value={reportFrom} onChange={e => setReportFrom(e.target.value)}
                 className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-background" />
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">To</label>
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{t('analytics.to')}</label>
               <input type="datetime-local" value={reportTo} onChange={e => setReportTo(e.target.value)}
                 className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-background" />
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Quick Range</p>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{t('providerReports.quickRange')}</p>
             <div className="flex flex-wrap gap-2">
               {([
-                { label: 'Today',        days: 0  },
-                { label: 'Last 7 days',  days: 7  },
-                { label: 'Last 30 days', days: 30 },
-                { label: 'Last 90 days', days: 90 },
-                { label: 'This year',    days: -1 },
-              ] as { label: string; days: number }[]).map(({ label, days }) => (
+                { labelKey: 'common.today',               days: 0  },
+                { labelKey: 'providerReports.last7Days',  days: 7  },
+                { labelKey: 'providerReports.last30Days', days: 30 },
+                { labelKey: 'providerReports.last90Days', days: 90 },
+                { labelKey: 'providerReports.thisYear',   days: -1 },
+              ] as { labelKey: string; days: number }[]).map(({ labelKey, days }) => (
                 <button
-                  key={label}
+                  key={labelKey}
                   type="button"
                   onClick={() => {
                     const now = new Date();
@@ -180,37 +182,33 @@ export const ProviderReports: React.FC = () => {
                   }}
                   className="px-3 py-1.5 rounded-full text-xs font-medium border border-border bg-background hover:bg-muted transition-colors"
                 >
-                  {label}
+                  {t(labelKey)}
                 </button>
               ))}
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Filter by Status</p>
-            <div className="flex flex-wrap gap-2">
-              {[
-                { key: 'ALL',       label: 'All',       color: 'bg-primary text-primary-foreground',  inactive: 'border-border hover:bg-muted' },
-                { key: 'CURED',     label: 'Cured',     color: 'bg-green-600 text-white',              inactive: 'border-green-300 text-green-700 hover:bg-green-50' },
-                { key: 'NOT_CURED', label: 'Not Cured', color: 'bg-red-600 text-white',                inactive: 'border-red-300 text-red-700 hover:bg-red-50' },
-                { key: 'SEVERE',    label: 'Severe',    color: 'bg-red-900 text-white',                inactive: 'border-red-400 text-red-900 hover:bg-red-50' },
-                { key: 'MODERATE',  label: 'Moderate',  color: 'bg-yellow-500 text-white',             inactive: 'border-yellow-400 text-yellow-700 hover:bg-yellow-50' },
-                { key: 'URGENT',    label: 'Urgent',    color: 'bg-orange-500 text-white',             inactive: 'border-orange-400 text-orange-700 hover:bg-orange-50' },
-              ].map(({ key, label, color, inactive }) => (
-                <button key={key} type="button" onClick={() => setReportFilter(key)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
-                    reportFilter === key ? color : `bg-background ${inactive}`
-                  }`}>
-                  {label}
-                </button>
-              ))}
-            </div>
+            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{t('providerReports.filterByStatus')}</label>
+            <Select value={reportFilter} onValueChange={setReportFilter}>
+              <SelectTrigger className="w-full sm:w-48">
+                <SelectValue placeholder={t('providerReports.selectStatus')} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">{t('common.all')}</SelectItem>
+                <SelectItem value="CURED">{t('providerReports.cured')}</SelectItem>
+                <SelectItem value="NOT_CURED">{t('providerReports.notCured')}</SelectItem>
+                <SelectItem value="SEVERE">{t('providerReports.severe')}</SelectItem>
+                <SelectItem value="MODERATE">{t('providerReports.moderate')}</SelectItem>
+                <SelectItem value="URGENT">{t('providerReports.urgent')}</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <Button onClick={handleGenerateReport} disabled={loadingReport} className="w-full sm:w-auto">
             {loadingReport
-              ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Generating…</>
-              : <><FileText className="h-4 w-4 mr-2" />Generate Report</>}
+              ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />{t('providerReports.generating')}</>
+              : <><FileText className="h-4 w-4 mr-2" />{t('analytics.generateReport')}</>}
           </Button>
 
           {loadingReport ? (
@@ -219,8 +217,8 @@ export const ProviderReports: React.FC = () => {
             consultationRows.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <User className="h-10 w-10 mx-auto mb-2 opacity-40" />
-                <p className="text-sm font-medium">No completed consultations found</p>
-                <p className="text-xs mt-1">Try expanding the date range or changing the filter.</p>
+                <p className="text-sm font-medium">{t('providerReports.noConsultationsFound')}</p>
+                <p className="text-xs mt-1">{t('providerReports.noConsultationsHint')}</p>
               </div>
             ) : (
               <div className="overflow-x-auto rounded-lg border">
@@ -228,12 +226,13 @@ export const ProviderReports: React.FC = () => {
                   <thead>
                     <tr className="bg-primary text-primary-foreground">
                       <th className="text-left px-4 py-2.5 font-semibold">#</th>
-                      <th className="text-left px-4 py-2.5 font-semibold">Patient Name</th>
-                      <th className="text-left px-4 py-2.5 font-semibold">Diagnosis / Condition</th>
-                      <th className="text-left px-4 py-2.5 font-semibold">Urgency</th>
-                      <th className="text-left px-4 py-2.5 font-semibold">Prescription</th>
-                      <th className="text-left px-4 py-2.5 font-semibold">Date & Time</th>
-                      <th className="text-right px-4 py-2.5 font-semibold">Duration</th>
+                      <th className="text-left px-4 py-2.5 font-semibold">{t('providerReports.colPatientName')}</th>
+                      <th className="text-left px-4 py-2.5 font-semibold">{t('providerReports.colDiagnosis')}</th>
+                      <th className="text-left px-4 py-2.5 font-semibold">{t('common.status')}</th>
+                      <th className="text-left px-4 py-2.5 font-semibold">{t('providerReports.colUrgency')}</th>
+                      <th className="text-left px-4 py-2.5 font-semibold">{t('providerReports.colPrescription')}</th>
+                      <th className="text-left px-4 py-2.5 font-semibold">{t('providerReports.colDateTime')}</th>
+                      <th className="text-right px-4 py-2.5 font-semibold">{t('providerReports.colDuration')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -248,18 +247,31 @@ export const ProviderReports: React.FC = () => {
                         row.prescriptionStatus === 'DELIVERED'  ? 'text-green-700' :
                         row.prescriptionStatus === 'CANCELLED' || row.prescriptionStatus === 'FAILED'
                           ? 'text-red-600' : row.prescriptionStatus ? 'text-blue-700' : 'text-muted-foreground';
+
+                      const healthStatus: { label: string; cls: string } =
+                        row.urgencyLevel === 'EMERGENCY' ? { label: t('providerReports.severe'),   cls: 'bg-red-100 text-red-900 border-red-300' } :
+                        row.urgencyLevel === 'URGENT'    ? { label: t('providerReports.urgent'),   cls: 'bg-orange-100 text-orange-800 border-orange-300' } :
+                        row.urgencyLevel === 'ROUTINE'   ? { label: t('providerReports.moderate'), cls: 'bg-yellow-100 text-yellow-800 border-yellow-300' } :
+                        row.prescriptionStatus === 'DELIVERED' ? { label: t('providerReports.cured'),    cls: 'bg-green-100 text-green-800 border-green-300' } :
+                                                                 { label: t('providerReports.notCured'), cls: 'bg-gray-100 text-gray-700 border-gray-300' };
+
                       return (
                         <tr key={row.consultationId} className={i % 2 === 0 ? 'bg-muted/30' : 'bg-background'}>
                           <td className="px-4 py-2.5 border-b text-muted-foreground">{i + 1}</td>
                           <td className="px-4 py-2.5 border-b font-medium">{row.patientName}</td>
                           <td className="px-4 py-2.5 border-b text-muted-foreground">{row.diagnosis ?? '—'}</td>
                           <td className="px-4 py-2.5 border-b">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${healthStatus.cls}`}>
+                              {healthStatus.label}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2.5 border-b">
                             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${urgencyColor}`}>
                               {row.urgencyLevel ?? 'UNKNOWN'}
                             </span>
                           </td>
                           <td className={`px-4 py-2.5 border-b text-xs font-medium ${rxColor}`}>
-                            {row.prescriptionStatus ? row.prescriptionStatus.replace(/_/g, ' ') : 'None'}
+                            {row.prescriptionStatus ? row.prescriptionStatus.replace(/_/g, ' ') : t('common.none')}
                           </td>
                           <td className="px-4 py-2.5 border-b text-muted-foreground whitespace-nowrap">
                             {row.startedAt ? new Date(row.startedAt).toLocaleString('en-RW', { dateStyle: 'medium', timeStyle: 'short' }) : '—'}
@@ -273,7 +285,7 @@ export const ProviderReports: React.FC = () => {
                   </tbody>
                 </table>
                 <div className="px-4 py-2 border-t bg-muted/20 text-xs text-muted-foreground">
-                  {consultationRows.length} consultation{consultationRows.length !== 1 ? 's' : ''} · Filter: {reportFilter}
+                  {t('providerReports.consultationCount', { count: consultationRows.length, filter: reportFilter })}
                 </div>
               </div>
             )
@@ -286,18 +298,18 @@ export const ProviderReports: React.FC = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Activity className="h-5 w-5" />
-            General Check-Up Report
+            {t('providerReports.checkUpReport')}
           </CardTitle>
           <p className="text-sm text-muted-foreground">
-            Generate a full patient check-up report including medical history, vitals, AI screening, and your observations.
+            {t('providerReports.checkUpSubtitle')}
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-1.5">
-            <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Select Patient</Label>
+            <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{t('providerReports.selectPatient')}</Label>
             <Select value={checkUpPatientId} onValueChange={setCheckUpPatientId}>
               <SelectTrigger>
-                <SelectValue placeholder="Choose a patient from your appointments…" />
+                <SelectValue placeholder={t('providerReports.patientPlaceholder')} />
               </SelectTrigger>
               <SelectContent>
                 {patients.map(p => (
@@ -308,23 +320,23 @@ export const ProviderReports: React.FC = () => {
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Doctor's Observations</Label>
+            <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{t('providerReports.doctorObservations')}</Label>
             <Textarea rows={4}
-              placeholder="Enter your clinical observations, physical examination findings, patient condition…"
+              placeholder={t('providerReports.observationsPlaceholder')}
               value={observations} onChange={e => setObservations(e.target.value)} />
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Notes and Next Steps</Label>
+            <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{t('providerReports.notesNextSteps')}</Label>
             <Textarea rows={3}
-              placeholder="Follow-up appointments, referrals, lifestyle recommendations, next tests…"
+              placeholder={t('providerReports.nextStepsPlaceholder')}
               value={nextSteps} onChange={e => setNextSteps(e.target.value)} />
           </div>
 
           <Button onClick={handleGenerateCheckUpReport} disabled={generatingCheckUp || !checkUpPatientId} className="w-full sm:w-auto">
             {generatingCheckUp
-              ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Generating…</>
-              : <><FileText className="h-4 w-4 mr-2" />Generate Check-Up Report PDF</>}
+              ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />{t('providerReports.generating')}</>
+              : <><FileText className="h-4 w-4 mr-2" />{t('providerReports.generateCheckUp')}</>}
           </Button>
         </CardContent>
       </Card>

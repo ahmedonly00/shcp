@@ -271,6 +271,7 @@ def _normalise_duration(raw: str) -> str | None:
 
 
 @analysis_bp.get("/health")
+@limiter.exempt
 def health():
     """
     Service liveness probe and model metadata.

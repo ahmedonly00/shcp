@@ -113,4 +113,18 @@ export const analyticsApi = {
   saveScheduledConfig: (config: ScheduledReportConfig) =>
     apiClient.put<ScheduledReportConfig>('/analytics/admin/scheduled-report', config)
       .then(unwrap<ScheduledReportConfig>),
+
+  sendMohReportNow: (from: string, to: string, metrics: string[]) =>
+    apiClient.post<string>('/analytics/admin/report/send-now', null, {
+      params: { from, to, metrics: metrics.join(',') },
+    }).then(unwrap<string>),
+
+  sendMohReportPdf: async (from: string, to: string, metrics: string[], pdfBytes: Uint8Array) => {
+    const formData = new FormData();
+    formData.append('pdf', new Blob([pdfBytes.buffer as ArrayBuffer], { type: 'application/pdf' }), `moh-report-${from}-to-${to}.pdf`);
+    const params = new URLSearchParams({ from, to, metrics: metrics.join(',') });
+    return apiClient.post<string>(`/analytics/admin/report/send-pdf?${params}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }).then(unwrap<string>);
+  },
 };

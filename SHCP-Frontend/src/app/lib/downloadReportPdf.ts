@@ -94,11 +94,11 @@ function drawPageFooter(
 
 // ── MOH Report PDF ─────────────────────────────────────────────────────────────
 
-export async function downloadMohReportPdf(
+async function buildMohReportDoc(
   data: ReportData,
-  generatedBy = 'Administrator',
-  consultations: AdminConsultationRow[] = [],
-): Promise<void> {
+  generatedBy: string,
+  consultations: AdminConsultationRow[],
+): Promise<JsPDFDoc> {
   const { jsPDF }     = await import('jspdf');
   const { autoTable } = await import('jspdf-autotable');
 
@@ -115,11 +115,16 @@ export async function downloadMohReportPdf(
   doc.setFillColor(C.primary);
   doc.rect(0, headerH, pw, 1.5, 'F');
 
+  const logoW = 30, logoH = 19;
+  const logoX = margin - 1;
+  const logoY = (headerH - logoH) / 2;
+  doc.setFillColor(C.white);
+  doc.roundedRect(logoX - 1, logoY - 1, logoW + 2, logoH + 2, 3, 3, 'F');
   if (logoDataUrl) {
-    try { doc.addImage(logoDataUrl, 'PNG', margin, 4, 28, 28); } catch { /* skip */ }
+    try { doc.addImage(logoDataUrl, 'PNG', logoX, logoY, logoW, logoH); } catch { /* skip */ }
   }
 
-  const lx = margin + 33;
+  const lx = logoX + logoW + 6;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(16);
   doc.setTextColor(C.white);
@@ -290,14 +295,16 @@ export async function downloadMohReportPdf(
     });
   }
 
-  // ── Provider-Patient Consultation Records ──────────────────────────────────
+  // ── Provider-Patient Consultation Records (landscape for readable columns) ──
   if (consultations.length > 0) {
-    doc.addPage(); let cy = 20;
+    doc.addPage('a4', 'landscape');
+    const lMargin = 15;
+    let cy = 20;
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8.5);
     doc.setTextColor(C.navy);
-    doc.text(`PROVIDER-PATIENT CONSULTATION RECORDS  (${consultations.length} records)`, margin, cy);
+    doc.text(`PROVIDER-PATIENT CONSULTATION RECORDS  (${consultations.length} records)`, lMargin, cy);
     cy += 3;
 
     const urgencyLabel = (level: string | null) => {
@@ -306,9 +313,24 @@ export async function downloadMohReportPdf(
       return map[level] ?? level;
     };
 
+    const adminUrgencyBg = (level: string | null) => {
+      if (level === 'EMERGENCY') return '#FEE2E2';
+      if (level === 'URGENT')    return '#FFEDD5';
+      if (level === 'ROUTINE')   return '#FEF9C3';
+      if (level === 'SELF_CARE') return '#DCFCE7';
+      return '#F3F4F6';
+    };
+    const adminUrgencyColor = (level: string | null) => {
+      if (level === 'EMERGENCY') return '#991B1B';
+      if (level === 'URGENT')    return '#9A3412';
+      if (level === 'ROUTINE')   return '#854D0E';
+      if (level === 'SELF_CARE') return '#166534';
+      return '#6B7280';
+    };
+
     autoTable(doc, {
       startY: cy,
-      margin: { left: margin, right: margin },
+      margin: { left: lMargin, right: lMargin },
       head: [['#', 'Provider', 'Patient', 'Diagnosis', 'Medications', 'Urgency', 'Date & Time', 'Duration']],
       body: consultations.map((row, i) => [
         String(i + 1),
@@ -316,40 +338,76 @@ export async function downloadMohReportPdf(
         row.patientName,
         row.diagnosis ?? '—',
         row.medications ?? 'None prescribed',
-        urgencyLabel(row.urgencyLevel),
+        '',
         row.startedAt ? new Date(row.startedAt).toLocaleString('en-RW', { dateStyle: 'short', timeStyle: 'short' }) : '—',
         row.durationMinutes != null ? `${row.durationMinutes} min` : '—',
       ]),
       headStyles: {
-        fillColor: C.navy, textColor: C.white, fontStyle: 'bold', fontSize: 7.5,
-        cellPadding: { top: 3.5, bottom: 3.5, left: 4, right: 4 },
+        fillColor: C.navy, textColor: C.white, fontStyle: 'bold', fontSize: 8,
+        cellPadding: { top: 4, bottom: 4, left: 4, right: 4 },
       },
-      bodyStyles: { fontSize: 7.5, textColor: C.gray900, cellPadding: { top: 3, bottom: 3, left: 4, right: 4 } },
+      bodyStyles: { fontSize: 8, textColor: C.gray900, cellPadding: { top: 3.5, bottom: 3.5, left: 4, right: 4 } },
       alternateRowStyles: { fillColor: C.gray100 },
       columnStyles: {
-        0: { cellWidth: 8,  halign: 'center' },
-        1: { cellWidth: 28 },
-        2: { cellWidth: 26 },
+        0: { cellWidth: 10, halign: 'center', cellPadding: { top: 3, bottom: 3, left: 2, right: 2 } },
+        1: { cellWidth: 33 },
+        2: { cellWidth: 30 },
         3: { cellWidth: 'auto' },
-        4: { cellWidth: 36 },
-        5: { cellWidth: 18, halign: 'center' },
-        6: { cellWidth: 26, halign: 'center' },
-        7: { cellWidth: 14, halign: 'right' },
+        4: { cellWidth: 40 },
+        5: { cellWidth: 22, halign: 'center' },
+        6: { cellWidth: 30, halign: 'center' },
+        7: { cellWidth: 16, halign: 'right' },
       },
       tableLineColor: C.gray300,
       tableLineWidth: 0.2,
       theme: 'grid',
+      didDrawCell: (hook) => {
+        if (hook.column.index === 5 && hook.section === 'body') {
+          const level = consultations[hook.row.index]?.urgencyLevel ?? null;
+          doc.setFillColor(adminUrgencyBg(level));
+          doc.rect(hook.cell.x + 0.1, hook.cell.y + 0.1, hook.cell.width - 0.2, hook.cell.height - 0.2, 'F');
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(7);
+          doc.setTextColor(adminUrgencyColor(level));
+          doc.text(
+            urgencyLabel(level),
+            hook.cell.x + hook.cell.width / 2,
+            hook.cell.y + hook.cell.height / 2 + 1.5,
+            { align: 'center' },
+          );
+        }
+      },
     });
   }
 
-  // ── Footer on all pages ────────────────────────────────────────────────────
+  // ── Footer on all pages (per-page dimensions handle landscape correctly) ────
   const totalPages = (doc as unknown as { internal: { getNumberOfPages(): number } }).internal.getNumberOfPages();
   for (let p = 1; p <= totalPages; p++) {
     doc.setPage(p);
-    drawPageFooter(doc, pw, ph, margin, generatedBy, p);
+    const fpw = doc.internal.pageSize.getWidth();
+    const fph = doc.internal.pageSize.getHeight();
+    drawPageFooter(doc, fpw, fph, margin, generatedBy, p);
   }
 
+  return doc;
+}
+
+export async function downloadMohReportPdf(
+  data: ReportData,
+  generatedBy = 'Administrator',
+  consultations: AdminConsultationRow[] = [],
+): Promise<void> {
+  const doc = await buildMohReportDoc(data, generatedBy, consultations);
   doc.save(`SHCP-MOH-Report-${data.fromDate}-to-${data.toDate}.pdf`);
+}
+
+export async function generateMohReportPdfBytes(
+  data: ReportData,
+  generatedBy = 'Administrator',
+  consultations: AdminConsultationRow[] = [],
+): Promise<Uint8Array> {
+  const doc = await buildMohReportDoc(data, generatedBy, consultations);
+  return new Uint8Array(doc.output('arraybuffer') as ArrayBuffer);
 }
 
 // ── Provider Report PDF ────────────────────────────────────────────────────────
@@ -380,11 +438,16 @@ export async function downloadProviderReportPdf(
   doc.setFillColor(C.primary);
   doc.rect(0, headerH, pw, 1.5, 'F');
 
+  const logoW = 30, logoH = 19;
+  const logoX = margin - 1;
+  const logoY = (headerH - logoH) / 2;
+  doc.setFillColor(C.white);
+  doc.roundedRect(logoX - 1, logoY - 1, logoW + 2, logoH + 2, 3, 3, 'F');
   if (logoDataUrl) {
-    try { doc.addImage(logoDataUrl, 'PNG', margin, 4, 28, 28); } catch { /* skip */ }
+    try { doc.addImage(logoDataUrl, 'PNG', logoX, logoY, logoW, logoH); } catch { /* skip */ }
   }
 
-  const lx = margin + 33;
+  const lx = logoX + logoW + 6;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(16);
   doc.setTextColor(C.white);
@@ -533,16 +596,39 @@ export async function downloadProviderReportPdf(
       return level ? (map[level] ?? level) : '—';
     };
 
+    const statusLabel = (row: ProviderConsultationRow): string => {
+      if (row.urgencyLevel === 'EMERGENCY') return 'Severe';
+      if (row.urgencyLevel === 'URGENT')    return 'Urgent';
+      if (row.urgencyLevel === 'ROUTINE')   return 'Moderate';
+      if (row.prescriptionStatus === 'DELIVERED') return 'Cured';
+      return 'Not Cured';
+    };
+    const statusBg = (row: ProviderConsultationRow): string => {
+      if (row.urgencyLevel === 'EMERGENCY') return C.redLight;
+      if (row.urgencyLevel === 'URGENT')    return C.orangeLight;
+      if (row.urgencyLevel === 'ROUTINE')   return C.amberLight;
+      if (row.prescriptionStatus === 'DELIVERED') return C.greenLight;
+      return C.gray100;
+    };
+    const statusColor = (row: ProviderConsultationRow): string => {
+      if (row.urgencyLevel === 'EMERGENCY') return C.red;
+      if (row.urgencyLevel === 'URGENT')    return C.orange;
+      if (row.urgencyLevel === 'ROUTINE')   return C.amber;
+      if (row.prescriptionStatus === 'DELIVERED') return C.green;
+      return C.gray500;
+    };
+
     autoTable(doc, {
       startY: y,
       margin: { left: margin, right: margin },
-      head: [['#', 'Patient Name', 'Diagnosis / Condition', 'Urgency', 'Prescription', 'Date & Time', 'Duration']],
+      head: [['#', 'Patient Name', 'Diagnosis / Condition', 'Status', 'Urgency', 'Prescription', 'Date & Time', 'Duration']],
       body: consultations.map((row, i) => [
         String(i + 1),
         row.patientName ?? '—',
         row.diagnosis   ?? '—',
-        urgencyLabel(row.urgencyLevel),
-        row.prescriptionStatus ? row.prescriptionStatus.replace(/_/g, ' ') : 'None',
+        '',   // Status — rendered by didDrawCell
+        '',   // Urgency — rendered by didDrawCell
+        '',   // Prescription — rendered by didDrawCell
         row.startedAt
           ? new Date(row.startedAt).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
           : '—',
@@ -562,28 +648,42 @@ export async function downloadProviderReportPdf(
       },
       alternateRowStyles: { fillColor: C.rowAlt },
       columnStyles: {
-        0: { cellWidth: 8,  halign: 'center', textColor: C.gray500 },
+        0: { cellWidth: 10, halign: 'center', textColor: C.gray500, cellPadding: { top: 3, bottom: 3, left: 2, right: 2 } },
         1: { cellWidth: 30, fontStyle: 'bold' },
         2: { cellWidth: 'auto' },
-        3: { cellWidth: 22, halign: 'center' },
-        4: { cellWidth: 22, halign: 'center' },
-        5: { cellWidth: 28, halign: 'center' },
-        6: { cellWidth: 15, halign: 'right' },
+        3: { cellWidth: 18, halign: 'center' },   // Status
+        4: { cellWidth: 20, halign: 'center' },   // Urgency
+        5: { cellWidth: 20, halign: 'center' },   // Prescription
+        6: { cellWidth: 26, halign: 'center' },   // Date & Time
+        7: { cellWidth: 14, halign: 'right' },    // Duration
       },
       tableLineColor: C.gray300,
       tableLineWidth: 0.2,
       theme: 'grid',
       didDrawCell: (hook) => {
-        // Color the urgency cell background
+        // Status badge (Cured / Not Cured / Severe / Urgent / Moderate)
         if (hook.column.index === 3 && hook.section === 'body') {
-          const level = (consultations[hook.row.index]?.urgencyLevel) ?? null;
-          const bg  = urgencyBg(level);
-          const col = urgencyColor(level);
-          doc.setFillColor(bg);
+          const row = consultations[hook.row.index];
+          doc.setFillColor(statusBg(row));
           doc.rect(hook.cell.x + 0.1, hook.cell.y + 0.1, hook.cell.width - 0.2, hook.cell.height - 0.2, 'F');
           doc.setFont('helvetica', 'bold');
           doc.setFontSize(6.5);
-          doc.setTextColor(col);
+          doc.setTextColor(statusColor(row));
+          doc.text(
+            statusLabel(row),
+            hook.cell.x + hook.cell.width / 2,
+            hook.cell.y + hook.cell.height / 2 + 1.5,
+            { align: 'center' },
+          );
+        }
+        // Urgency badge
+        if (hook.column.index === 4 && hook.section === 'body') {
+          const level = (consultations[hook.row.index]?.urgencyLevel) ?? null;
+          doc.setFillColor(urgencyBg(level));
+          doc.rect(hook.cell.x + 0.1, hook.cell.y + 0.1, hook.cell.width - 0.2, hook.cell.height - 0.2, 'F');
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(6.5);
+          doc.setTextColor(urgencyColor(level));
           doc.text(
             urgencyLabel(level),
             hook.cell.x + hook.cell.width / 2,
@@ -591,8 +691,8 @@ export async function downloadProviderReportPdf(
             { align: 'center' },
           );
         }
-        // Color-coded prescription status
-        if (hook.column.index === 4 && hook.section === 'body') {
+        // Prescription status
+        if (hook.column.index === 5 && hook.section === 'body') {
           const rx = consultations[hook.row.index]?.prescriptionStatus;
           const col = rx === 'DELIVERED'
             ? C.green
@@ -663,11 +763,16 @@ export async function downloadPatientCheckUpPdf(input: CheckUpReportInput): Prom
   doc.setFillColor(C.primary);
   doc.rect(0, headerH, pw, 1.5, 'F');
 
+  const logoW = 30, logoH = 19;
+  const logoX = margin - 1;
+  const logoY = (headerH - logoH) / 2;
+  doc.setFillColor(C.white);
+  doc.roundedRect(logoX - 1, logoY - 1, logoW + 2, logoH + 2, 3, 3, 'F');
   if (logoDataUrl) {
-    try { doc.addImage(logoDataUrl, 'PNG', margin, 4, 28, 28); } catch { /* skip */ }
+    try { doc.addImage(logoDataUrl, 'PNG', logoX, logoY, logoW, logoH); } catch { /* skip */ }
   }
 
-  const lx = margin + 33;
+  const lx = logoX + logoW + 6;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(16);
   doc.setTextColor(C.white);
@@ -1009,8 +1114,10 @@ export async function downloadPlatformStatsPdf(
   const headerH = 38;
   doc.setFillColor(C.navy); doc.rect(0, 0, pw, headerH, 'F');
   doc.setFillColor(C.primary); doc.rect(0, headerH, pw, 1.5, 'F');
-  if (logoDataUrl) { try { doc.addImage(logoDataUrl, 'PNG', margin, 4, 28, 28); } catch { /* skip */ } }
-  const lx = margin + 33;
+  const logoW = 30, logoH = 19; const logoX = margin - 1; const logoY = (headerH - logoH) / 2;
+  doc.setFillColor(C.white); doc.roundedRect(logoX - 1, logoY - 1, logoW + 2, logoH + 2, 3, 3, 'F');
+  if (logoDataUrl) { try { doc.addImage(logoDataUrl, 'PNG', logoX, logoY, logoW, logoH); } catch { /* skip */ } }
+  const lx = logoX + logoW + 6;
   doc.setFont('helvetica', 'bold'); doc.setFontSize(16); doc.setTextColor(C.white); doc.text('SHCP', lx, 16);
   doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor('#A8C8E8'); doc.text('Smart Health Consultation Platform', lx, 22);
   doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(C.white); doc.text('PLATFORM STATISTICS', pw - margin, 15, { align: 'right' });
@@ -1078,8 +1185,10 @@ export async function downloadAppointmentsPdf(
   const headerH = 38;
   doc.setFillColor(C.navy); doc.rect(0, 0, pw, headerH, 'F');
   doc.setFillColor(C.primary); doc.rect(0, headerH, pw, 1.5, 'F');
-  if (logoDataUrl) { try { doc.addImage(logoDataUrl, 'PNG', margin, 4, 28, 28); } catch { /* skip */ } }
-  const lx = margin + 33;
+  const logoW = 30, logoH = 19; const logoX = margin - 1; const logoY = (headerH - logoH) / 2;
+  doc.setFillColor(C.white); doc.roundedRect(logoX - 1, logoY - 1, logoW + 2, logoH + 2, 3, 3, 'F');
+  if (logoDataUrl) { try { doc.addImage(logoDataUrl, 'PNG', logoX, logoY, logoW, logoH); } catch { /* skip */ } }
+  const lx = logoX + logoW + 6;
   doc.setFont('helvetica', 'bold'); doc.setFontSize(16); doc.setTextColor(C.white); doc.text('SHCP', lx, 16);
   doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor('#A8C8E8'); doc.text('Smart Health Consultation Platform', lx, 22);
   doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(C.white); doc.text('APPOINTMENTS REPORT', pw - margin, 15, { align: 'right' });
@@ -1128,8 +1237,10 @@ export async function downloadRegistrationsPdf(
   const headerH = 38;
   doc.setFillColor(C.navy); doc.rect(0, 0, pw, headerH, 'F');
   doc.setFillColor(C.primary); doc.rect(0, headerH, pw, 1.5, 'F');
-  if (logoDataUrl) { try { doc.addImage(logoDataUrl, 'PNG', margin, 4, 28, 28); } catch { /* skip */ } }
-  const lx = margin + 33;
+  const logoW = 30, logoH = 19; const logoX = margin - 1; const logoY = (headerH - logoH) / 2;
+  doc.setFillColor(C.white); doc.roundedRect(logoX - 1, logoY - 1, logoW + 2, logoH + 2, 3, 3, 'F');
+  if (logoDataUrl) { try { doc.addImage(logoDataUrl, 'PNG', logoX, logoY, logoW, logoH); } catch { /* skip */ } }
+  const lx = logoX + logoW + 6;
   doc.setFont('helvetica', 'bold'); doc.setFontSize(16); doc.setTextColor(C.white); doc.text('SHCP', lx, 16);
   doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor('#A8C8E8'); doc.text('Smart Health Consultation Platform', lx, 22);
   doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(C.white); doc.text('REGISTRATIONS REPORT', pw - margin, 15, { align: 'right' });
@@ -1215,8 +1326,10 @@ export async function downloadSymptomAssessmentPdf(check: SymptomCheck): Promise
   const headerH = 38;
   doc.setFillColor(C.navy); doc.rect(0, 0, pw, headerH, 'F');
   doc.setFillColor(C.primary); doc.rect(0, headerH, pw, 1.5, 'F');
-  if (logoDataUrl) { try { doc.addImage(logoDataUrl, 'PNG', margin, 4, 28, 28); } catch { /* skip */ } }
-  const lx = margin + 33;
+  const logoW = 30, logoH = 19; const logoX = margin - 1; const logoY = (headerH - logoH) / 2;
+  doc.setFillColor(C.white); doc.roundedRect(logoX - 1, logoY - 1, logoW + 2, logoH + 2, 3, 3, 'F');
+  if (logoDataUrl) { try { doc.addImage(logoDataUrl, 'PNG', logoX, logoY, logoW, logoH); } catch { /* skip */ } }
+  const lx = logoX + logoW + 6;
   doc.setFont('helvetica', 'bold'); doc.setFontSize(16); doc.setTextColor(C.white); doc.text('SHCP', lx, 16);
   doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor('#A8C8E8'); doc.text('Smart Health Consultation Platform', lx, 22);
   doc.setFontSize(6.5); doc.setTextColor('#7AAFD4'); doc.text('Ministry of Health - Rwanda', lx, 28);

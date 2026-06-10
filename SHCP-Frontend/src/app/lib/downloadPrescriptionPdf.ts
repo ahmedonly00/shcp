@@ -289,17 +289,27 @@ export async function downloadPrescriptionPdf(rx: ApiPrescriptionDto): Promise<v
   doc.setFillColor(C.primary);
   doc.rect(0, footY, pw, 20, 'F');
 
-  // Cross icon in footer
-  drawCross(doc, margin, footY + 3, 14, C.white);
+  // IVAS logo in white pill in footer
+  const fLogoW = 22, fLogoH = 14;
+  const fLogoX = margin - 1;
+  const fLogoY = footY + (20 - fLogoH) / 2;
+  doc.setFillColor(C.white);
+  doc.roundedRect(fLogoX - 1, fLogoY - 1, fLogoW + 2, fLogoH + 2, 2, 2, 'F');
+  if (ivasLogo) {
+    doc.addImage(ivasLogo, 'PNG', fLogoX, fLogoY, fLogoW, fLogoH);
+  } else {
+    drawCross(doc, margin, footY + 3, 14, C.white);
+  }
 
+  const ftx = fLogoX + fLogoW + 5;
   doc.setTextColor(C.white);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7);
-  doc.text('Smart Health Consultation Platform', margin + 18, footY + 7);
+  doc.text('Smart Health Consultation Platform', ftx, footY + 7);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6.5);
   doc.setTextColor(200, 220, 240);
-  doc.text('Endorsed by Ministry of Health Rwanda · Rwanda DPA Compliant', margin + 18, footY + 12);
+  doc.text('Endorsed by Ministry of Health Rwanda · Rwanda DPA Compliant', ftx, footY + 12);
 
   doc.setTextColor(C.white);
   doc.setFont('helvetica', 'normal');

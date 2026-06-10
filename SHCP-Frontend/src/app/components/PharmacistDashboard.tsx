@@ -13,7 +13,7 @@ import {
 } from "@/app/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/app/components/ui/tabs";
 import {
-  Package, Truck, Users, RefreshCw, CheckCircle, Clock, AlertTriangle, FlaskConical, Trash2,
+  Package, Truck, Users, RefreshCw, CheckCircle, Clock, AlertTriangle, FlaskConical, Trash2, Pencil,
 } from "lucide-react";
 import * as api from "@/app/api/pharmacist";
 
@@ -467,14 +467,17 @@ function BikersTab() {
 
 // ── Inventory Tab ──────────────────────────────────────────────────────────
 
+const BLANK_FORM: api.StockUpdateRequest = {
+  medicationName: "", genericName: "", quantityInStock: 0,
+  unit: "units", expiryDate: "", reorderLevel: 10,
+};
+
 function InventoryTab() {
   const [items, setItems] = useState<api.InventoryItemDto[]>([]);
   const [loading, setLoading] = useState(true);
-  const [addOpen, setAddOpen] = useState(false);
-  const [form, setForm] = useState<api.StockUpdateRequest>({
-    medicationName: "", genericName: "", quantityInStock: 0,
-    unit: "units", expiryDate: "", reorderLevel: 10,
-  });
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<api.InventoryItemDto | null>(null);
+  const [form, setForm] = useState<api.StockUpdateRequest>(BLANK_FORM);
 
   const load = () => {
     setLoading(true);
@@ -486,15 +489,41 @@ function InventoryTab() {
 
   useEffect(() => { load(); }, []);
 
+  const openAdd = () => {
+    setEditingItem(null);
+    setForm(BLANK_FORM);
+    setDialogOpen(true);
+  };
+
+  const openEdit = (item: api.InventoryItemDto) => {
+    setEditingItem(item);
+    setForm({
+      medicationName:  item.medicationName,
+      genericName:     item.genericName ?? "",
+      quantityInStock: item.quantityInStock,
+      unit:            item.unit,
+      expiryDate:      item.expiryDate ?? "",
+      reorderLevel:    item.reorderLevel,
+    });
+    setDialogOpen(true);
+  };
+
+  const handleClose = (open: boolean) => {
+    setDialogOpen(open);
+    if (!open) { setEditingItem(null); setForm(BLANK_FORM); }
+  };
+
   const handleUpsert = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       await api.upsertStock(form);
-      toast.success(`Stock updated for "${form.medicationName}"`);
-      setAddOpen(false);
-      setForm({ medicationName: "", genericName: "", quantityInStock: 0, unit: "units", expiryDate: "", reorderLevel: 10 });
+      toast.success(editingItem
+        ? `"${form.medicationName}" updated`
+        : `"${form.medicationName}" added to inventory`
+      );
+      handleClose(false);
       load();
-    } catch { toast.error("Failed to update stock"); }
+    } catch { toast.error("Failed to save medication"); }
   };
 
   const handleDelete = async (id: string, name: string) => {
@@ -522,60 +551,72 @@ function InventoryTab() {
           <Button variant="outline" size="sm" onClick={load}>
             <RefreshCw className="h-4 w-4 mr-1" /> Refresh
           </Button>
-          <Dialog open={addOpen} onOpenChange={setAddOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" className="bg-primary hover:bg-primary/90 text-white">
-                + Add / Update Stock
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md">
-              <DialogHeader><DialogTitle>Update Stock</DialogTitle></DialogHeader>
-              <form onSubmit={handleUpsert} className="space-y-3 py-2">
-                <div>
-                  <Label>Medication Name *</Label>
-                  <Input required value={form.medicationName}
-                    onChange={e => setForm(f => ({ ...f, medicationName: e.target.value }))}
-                    placeholder="e.g. Amoxicillin 500mg" />
-                </div>
-                <div>
-                  <Label>Generic Name</Label>
-                  <Input value={form.genericName ?? ""}
-                    onChange={e => setForm(f => ({ ...f, genericName: e.target.value }))}
-                    placeholder="e.g. amoxicillin" />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label>Quantity in Stock *</Label>
-                    <Input type="number" min={0} required value={form.quantityInStock}
-                      onChange={e => setForm(f => ({ ...f, quantityInStock: Number(e.target.value) }))} />
-                  </div>
-                  <div>
-                    <Label>Unit</Label>
-                    <Input value={form.unit ?? "units"}
-                      onChange={e => setForm(f => ({ ...f, unit: e.target.value }))}
-                      placeholder="tablets, vials…" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label>Reorder Level</Label>
-                    <Input type="number" min={0} value={form.reorderLevel ?? 10}
-                      onChange={e => setForm(f => ({ ...f, reorderLevel: Number(e.target.value) }))} />
-                  </div>
-                  <div>
-                    <Label>Expiry Date</Label>
-                    <Input type="date" value={form.expiryDate ?? ""}
-                      onChange={e => setForm(f => ({ ...f, expiryDate: e.target.value }))} />
-                  </div>
-                </div>
-                <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-white">
-                  Save Stock
-                </Button>
-              </form>
-            </DialogContent>
-          </Dialog>
+          <Button size="sm" className="bg-primary hover:bg-primary/90 text-white" onClick={openAdd}>
+            + Add Medication
+          </Button>
         </div>
       </div>
+
+      {/* Add / Edit dialog */}
+      <Dialog open={dialogOpen} onOpenChange={handleClose}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {editingItem ? `Update — ${editingItem.medicationName}` : "Add Medication"}
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleUpsert} className="space-y-3 py-2">
+            <div>
+              <Label>Medication Name *</Label>
+              <Input
+                required
+                value={form.medicationName}
+                readOnly={!!editingItem}
+                className={editingItem ? "bg-muted text-muted-foreground cursor-not-allowed" : ""}
+                onChange={e => setForm(f => ({ ...f, medicationName: e.target.value }))}
+                placeholder="e.g. Amoxicillin 500mg"
+              />
+              {editingItem && (
+                <p className="text-xs text-muted-foreground mt-1">Medication name cannot be changed — delete and re-add to rename.</p>
+              )}
+            </div>
+            <div>
+              <Label>Generic Name</Label>
+              <Input value={form.genericName ?? ""}
+                onChange={e => setForm(f => ({ ...f, genericName: e.target.value }))}
+                placeholder="e.g. amoxicillin" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Quantity in Stock *</Label>
+                <Input type="number" min={0} required value={form.quantityInStock}
+                  onChange={e => setForm(f => ({ ...f, quantityInStock: Number(e.target.value) }))} />
+              </div>
+              <div>
+                <Label>Unit</Label>
+                <Input value={form.unit ?? "units"}
+                  onChange={e => setForm(f => ({ ...f, unit: e.target.value }))}
+                  placeholder="tablets, vials…" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Reorder Level</Label>
+                <Input type="number" min={0} value={form.reorderLevel ?? 10}
+                  onChange={e => setForm(f => ({ ...f, reorderLevel: Number(e.target.value) }))} />
+              </div>
+              <div>
+                <Label>Expiry Date</Label>
+                <Input type="date" value={form.expiryDate ?? ""}
+                  onChange={e => setForm(f => ({ ...f, expiryDate: e.target.value }))} />
+              </div>
+            </div>
+            <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-white">
+              {editingItem ? "Save Changes" : "Add to Inventory"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {loading ? (
         <div className="text-center py-8 text-muted-foreground">Loading inventory…</div>
@@ -617,10 +658,16 @@ function InventoryTab() {
                     )}
                   </td>
                   <td className="py-2">
-                    <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-700 h-7 w-7 p-0"
-                            onClick={() => handleDelete(item.inventoryId, item.medicationName)}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button size="sm" variant="ghost" className="text-primary hover:text-primary/80 h-7 w-7 p-0"
+                              onClick={() => openEdit(item)} title="Edit medication">
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-700 h-7 w-7 p-0"
+                              onClick={() => handleDelete(item.inventoryId, item.medicationName)} title="Remove medication">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}
