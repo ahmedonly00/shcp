@@ -58,19 +58,27 @@ async function fetchLogoBase64(url: string): Promise<string | null> {
   }
 }
 
+// Session-level cache: undefined = not yet fetched, null = unavailable, string = data URL
+let _ivasLogo: string | null | undefined = undefined;
+
+function getCachedLogo(): Promise<string | null> {
+  if (_ivasLogo !== undefined) return Promise.resolve(_ivasLogo);
+  return fetchLogoBase64('/ivas-logo.png').then(logo => { _ivasLogo = logo; return logo; });
+}
+
 /**
  * Generates and triggers a browser download for a prescription PDF.
  * jsPDF and jspdf-autotable are dynamically imported so they only load
  * when the patient actually requests a download — no impact on initial bundle.
  */
 export async function downloadPrescriptionPdf(rx: ApiPrescriptionDto): Promise<void> {
-  // Dynamic imports — only fetched on first call
-  const { jsPDF } = await import('jspdf');
-  const autoTableModule = await import('jspdf-autotable');
+  // All three heavy operations run in parallel
+  const [{ jsPDF }, autoTableModule, ivasLogo] = await Promise.all([
+    import('jspdf'),
+    import('jspdf-autotable'),
+    getCachedLogo(),
+  ]);
   const autoTable = (autoTableModule as unknown as { default: typeof autoTableModule.default }).default ?? autoTableModule.default;
-
-  // Load IVAS logo; falls back to drawn cross if unavailable
-  const ivasLogo = await fetchLogoBase64('/ivas-logo.png');
 
   let meds: MedicationItem[] = [];
   try { meds = JSON.parse(rx.medications); } catch { meds = []; }

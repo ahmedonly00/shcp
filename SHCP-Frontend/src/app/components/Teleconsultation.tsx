@@ -180,6 +180,7 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
   const [loadingPharmacies, setLoadingPharmacies] = useState(false);
   const [nearestPharmacies, setNearestPharmacies] = useState<NearestPharmacyDto[]>([]);
   const [loadingNearest, setLoadingNearest] = useState(false);
+  const [pharmacySearch, setPharmacySearch] = useState('');
   const [issuingRx, setIssuingRx] = useState(false);
   const [issuedRxList, setIssuedRxList] = useState<ApiPrescriptionDto[]>([]);
   const [notifyingPharmacy, setNotifyingPharmacy] = useState<string | null>(null);
@@ -1254,8 +1255,10 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
   // Fetch nearest pharmacies (debounced 600 ms) whenever delivery location changes
   useEffect(() => {
     if (!isProvider) return;
-    if (!rxDistrict && !rxLatitude) {
+    if (!rxDistrict && !rxSector && !rxCell && !rxLatitude) {
       setNearestPharmacies([]);
+      setRxPharmacyId('');
+      setPharmacySearch('');
       return;
     }
     const timer = setTimeout(() => {
@@ -1268,7 +1271,7 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
         lng:      rxLongitude ? Number(rxLongitude) : undefined,
         limit:    5,
       })
-        .then(list => setNearestPharmacies(list ?? []))
+        .then(list => { setNearestPharmacies(list ?? []); setRxPharmacyId(''); setPharmacySearch(''); })
         .catch(() => setNearestPharmacies([]))
         .finally(() => setLoadingNearest(false));
     }, 600);
@@ -1314,6 +1317,7 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
       setRxLatitude('');
       setRxLongitude('');
       setRxPharmacyId('');
+      setPharmacySearch('');
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } } };
       toast.error(e?.response?.data?.message || 'Failed to issue prescription');
@@ -1546,54 +1550,91 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
                     )}
                   </div>
 
-                  {/* Nearest pharmacies */}
-                  {(rxDistrict || rxLatitude) && (
-                    <div className="space-y-1.5">
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1">
-                        <MapPin className="h-3 w-3" /> Nearest Pharmacies
-                      </p>
-                      {loadingNearest ? (
-                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground py-1">
-                          <Loader2 className="h-3 w-3 animate-spin" /> Finding…
-                        </div>
-                      ) : nearestPharmacies.length > 0 ? (
-                        <div className="space-y-1">
-                          <button type="button" onClick={() => setRxPharmacyId('')}
-                            className={`w-full flex items-center gap-2 rounded-lg border px-3 py-2 text-left transition-colors text-xs ${rxPharmacyId === '' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border hover:border-primary/40'}`}>
-                            <div className={`h-3.5 w-3.5 rounded-full border-2 flex-shrink-0 ${rxPharmacyId === '' ? 'border-primary bg-primary' : 'border-muted-foreground'}`} />
-                            <span className="font-semibold">Auto-assign</span>
+                  {/* Pharmacy picker — nearest when location provided, search fallback otherwise */}
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                      <MapPin className="h-3 w-3" /> Pharmacy
+                    </p>
+                    {loadingNearest ? (
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground py-1">
+                        <Loader2 className="h-3 w-3 animate-spin" /> Finding nearest pharmacies…
+                      </div>
+                    ) : nearestPharmacies.length > 0 ? (
+                      <div className="space-y-1">
+                        <button type="button" onClick={() => setRxPharmacyId('')}
+                          className={`w-full flex items-center gap-2 rounded-lg border px-3 py-2 text-left transition-colors text-xs ${rxPharmacyId === '' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border hover:border-primary/40'}`}>
+                          <div className={`h-3.5 w-3.5 rounded-full border-2 flex-shrink-0 ${rxPharmacyId === '' ? 'border-primary bg-primary' : 'border-muted-foreground'}`} />
+                          <span className="font-semibold">Auto-assign</span>
+                        </button>
+                        {nearestPharmacies.map(p => (
+                          <button key={p.pharmacyId} type="button" onClick={() => setRxPharmacyId(p.pharmacyId)}
+                            className={`w-full flex items-center gap-2 rounded-lg border px-3 py-2 text-left transition-colors text-xs ${rxPharmacyId === p.pharmacyId ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border hover:border-primary/40'}`}>
+                            <div className={`h-3.5 w-3.5 rounded-full border-2 flex-shrink-0 ${rxPharmacyId === p.pharmacyId ? 'border-primary bg-primary' : 'border-muted-foreground'}`} />
+                            <div>
+                              <span className="font-medium">{p.name}</span>
+                              {p.distanceKm != null && (
+                                <span className="text-muted-foreground ml-1">
+                                  — {p.distanceKm < 1 ? `${Math.round(p.distanceKm * 1000)}m` : `${p.distanceKm.toFixed(1)}km`}
+                                </span>
+                              )}
+                            </div>
                           </button>
-                          {nearestPharmacies.map(p => (
-                            <button key={p.pharmacyId} type="button" onClick={() => setRxPharmacyId(p.pharmacyId)}
-                              className={`w-full flex items-center gap-2 rounded-lg border px-3 py-2 text-left transition-colors text-xs ${rxPharmacyId === p.pharmacyId ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border hover:border-primary/40'}`}>
-                              <div className={`h-3.5 w-3.5 rounded-full border-2 flex-shrink-0 ${rxPharmacyId === p.pharmacyId ? 'border-primary bg-primary' : 'border-muted-foreground'}`} />
-                              <div>
-                                <span className="font-medium">{p.name}</span>
-                                {p.distanceKm != null && (
-                                  <span className="text-muted-foreground ml-1">
-                                    — {p.distanceKm < 1 ? `${Math.round(p.distanceKm * 1000)}m` : `${p.distanceKm.toFixed(1)}km`}
-                                  </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {!rxDistrict && !rxSector && !rxCell && !rxLatitude ? (
+                          <p className="text-xs text-muted-foreground/70 italic">Enter a delivery location above, or search below to assign a pharmacy manually.</p>
+                        ) : (
+                          <p className="text-xs text-amber-600 flex items-center gap-1">
+                            <AlertCircle className="h-3 w-3" /> No pharmacies found near that location — search all pharmacies below.
+                          </p>
+                        )}
+                        {rxPharmacyId ? (
+                          <div className="flex items-start justify-between gap-2 rounded-md bg-green-50 border border-green-200 px-3 py-2">
+                            <p className="text-xs text-green-700 flex items-center gap-1">
+                              <CheckCircle className="h-3 w-3 shrink-0" />
+                              <span><span className="font-semibold">{pharmacies.find(p => p.pharmacyId === rxPharmacyId)?.name ?? 'Pharmacy'}</span> selected.</span>
+                            </p>
+                            <button type="button" className="text-xs text-muted-foreground hover:text-red-500 shrink-0"
+                              onClick={() => { setRxPharmacyId(''); setPharmacySearch(''); }}>
+                              Change
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            <input
+                              className="w-full border rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+                              placeholder="Type pharmacy name to search…"
+                              value={pharmacySearch}
+                              onChange={e => setPharmacySearch(e.target.value)}
+                            />
+                            {pharmacySearch.trim().length >= 1 && (
+                              <div className="border rounded-md bg-white shadow-sm max-h-40 overflow-y-auto divide-y">
+                                {pharmacies
+                                  .filter(p => p.name.toLowerCase().includes(pharmacySearch.toLowerCase()) || (p.address ?? '').toLowerCase().includes(pharmacySearch.toLowerCase()))
+                                  .slice(0, 8)
+                                  .map(p => (
+                                    <button key={p.pharmacyId} type="button"
+                                      className="w-full text-left px-3 py-2 text-xs hover:bg-blue-50 transition-colors"
+                                      onClick={() => { setRxPharmacyId(p.pharmacyId); setPharmacySearch(''); }}>
+                                      <span className="font-medium">{p.name}</span>
+                                      {p.address && <span className="block text-muted-foreground">{p.address}</span>}
+                                    </button>
+                                  ))}
+                                {pharmacies.filter(p =>
+                                  p.name.toLowerCase().includes(pharmacySearch.toLowerCase()) ||
+                                  (p.address ?? '').toLowerCase().includes(pharmacySearch.toLowerCase())
+                                ).length === 0 && (
+                                  <p className="px-3 py-2 text-xs text-muted-foreground">No pharmacies match "{pharmacySearch}"</p>
                                 )}
                               </div>
-                            </button>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="space-y-1.5">
-                          <p className="text-xs text-amber-600 flex items-center gap-1">
-                            <AlertCircle className="h-3 w-3" /> No nearby pharmacies found. Showing all:
-                          </p>
-                          {pharmacies.map(p => (
-                            <button key={p.pharmacyId} type="button" onClick={() => setRxPharmacyId(p.pharmacyId)}
-                              className={`w-full flex items-center gap-2 rounded-lg border px-3 py-2 text-left transition-colors text-xs ${rxPharmacyId === p.pharmacyId ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border hover:border-primary/40'}`}>
-                              <div className={`h-3.5 w-3.5 rounded-full border-2 flex-shrink-0 ${rxPharmacyId === p.pharmacyId ? 'border-primary bg-primary' : 'border-muted-foreground'}`} />
-                              <span className="font-medium">{p.name}</span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
+                            )}
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
 
                   {/* Conflicts */}
                   {rxConflicts.length > 0 && (
@@ -2843,52 +2884,17 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
                   )}
                 </div>
 
-                {/* Nearest pharmacies — shown when delivery location is filled in */}
+                {/* Pharmacy picker — nearest when location provided, search fallback otherwise */}
                 <div className="space-y-1.5">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1">
-                    <MapPin className="h-3 w-3" /> Nearest Pharmacies
+                    <MapPin className="h-3 w-3" /> Pharmacy
                   </p>
 
                   {loadingNearest ? (
                     <div className="flex items-center gap-1.5 text-xs text-muted-foreground py-2">
                       <Loader2 className="h-3 w-3 animate-spin" /> Finding nearest pharmacies…
                     </div>
-                  ) : !rxDistrict && !rxLatitude ? (
-                    <p className="text-xs text-muted-foreground/60 italic py-1">
-                      Enter a delivery district or GPS coordinates above to see nearby pharmacies.
-                    </p>
-                  ) : nearestPharmacies.length === 0 ? (
-                    <div className="space-y-1.5">
-                      <p className="text-xs text-amber-600 flex items-center gap-1 py-1">
-                        <AlertCircle className="h-3 w-3" /> No pharmacies found near that location.
-                      </p>
-                      {pharmacies.length > 0 && (
-                        <>
-                          <p className="text-xs text-muted-foreground/70">Showing all active pharmacies:</p>
-                          <div className="space-y-1">
-                            {pharmacies.map(p => (
-                              <button
-                                key={p.pharmacyId}
-                                type="button"
-                                onClick={() => setRxPharmacyId(p.pharmacyId)}
-                                className={`w-full flex items-center gap-2 rounded-lg border px-3 py-2 text-left transition-colors ${
-                                  rxPharmacyId === p.pharmacyId
-                                    ? 'border-primary bg-primary/5 ring-1 ring-primary'
-                                    : 'border-border hover:border-primary/40 hover:bg-muted/40'
-                                }`}
-                              >
-                                <div className={`h-3.5 w-3.5 rounded-full border-2 flex-shrink-0 ${rxPharmacyId === p.pharmacyId ? 'border-primary bg-primary' : 'border-muted-foreground'}`} />
-                                <div>
-                                  <span className="text-xs font-medium">{p.name}</span>
-                                  {p.address && <span className="text-xs text-muted-foreground ml-1">— {p.address}</span>}
-                                </div>
-                              </button>
-                            ))}
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  ) : (
+                  ) : nearestPharmacies.length > 0 ? (
                     <div className="space-y-1.5">
                       {/* Auto-assign option */}
                       <button
@@ -2970,6 +2976,76 @@ export const Teleconsultation: React.FC<TeleconsultationProps> = ({ appointment:
                           </button>
                         );
                       })}
+                    </div>
+                  ) : (
+                    /* No nearest pharmacies (either no location entered or none found nearby) */
+                    <div className="space-y-1.5">
+                      {!rxDistrict && !rxSector && !rxCell && !rxLatitude ? (
+                        <p className="text-xs text-muted-foreground/70 italic">
+                          Enter a delivery location above for nearest-pharmacy matching, or search below to assign manually.
+                        </p>
+                      ) : (
+                        <p className="text-xs text-amber-600 flex items-center gap-1">
+                          <AlertCircle className="h-3 w-3" /> No pharmacies found near that location — search all pharmacies below.
+                        </p>
+                      )}
+
+                      {/* Search-all fallback */}
+                      {rxPharmacyId ? (
+                        <div className="flex items-start justify-between gap-2 rounded-md bg-green-50 border border-green-200 px-3 py-2">
+                          <p className="text-xs text-green-700 flex items-center gap-1">
+                            <CheckCircle className="h-3 w-3 shrink-0" />
+                            <span>
+                              <span className="font-semibold">
+                                {pharmacies.find(p => p.pharmacyId === rxPharmacyId)?.name ?? 'Pharmacy'}
+                              </span>{' '}selected — prescription routed here.
+                            </span>
+                          </p>
+                          <button
+                            type="button"
+                            className="text-xs text-muted-foreground hover:text-red-500 shrink-0"
+                            onClick={() => { setRxPharmacyId(''); setPharmacySearch(''); }}
+                          >
+                            Change
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <input
+                            className="w-full border rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+                            placeholder="Type pharmacy name to search…"
+                            value={pharmacySearch}
+                            onChange={e => setPharmacySearch(e.target.value)}
+                          />
+                          {pharmacySearch.trim().length >= 1 && (
+                            <div className="border rounded-md bg-white shadow-sm max-h-48 overflow-y-auto divide-y">
+                              {pharmacies
+                                .filter(p =>
+                                  p.name.toLowerCase().includes(pharmacySearch.toLowerCase()) ||
+                                  (p.address ?? '').toLowerCase().includes(pharmacySearch.toLowerCase())
+                                )
+                                .slice(0, 8)
+                                .map(p => (
+                                  <button
+                                    key={p.pharmacyId}
+                                    type="button"
+                                    className="w-full text-left px-3 py-2 text-xs hover:bg-blue-50 transition-colors"
+                                    onClick={() => { setRxPharmacyId(p.pharmacyId); setPharmacySearch(''); }}
+                                  >
+                                    <span className="font-medium">{p.name}</span>
+                                    {p.address && <span className="block text-muted-foreground">{p.address}</span>}
+                                  </button>
+                                ))}
+                              {pharmacies.filter(p =>
+                                p.name.toLowerCase().includes(pharmacySearch.toLowerCase()) ||
+                                (p.address ?? '').toLowerCase().includes(pharmacySearch.toLowerCase())
+                              ).length === 0 && (
+                                <p className="px-3 py-2 text-xs text-muted-foreground">No pharmacies match "{pharmacySearch}"</p>
+                              )}
+                            </div>
+                          )}
+                        </>
+                      )}
                     </div>
                   )}
                 </div>

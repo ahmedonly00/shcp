@@ -23,6 +23,7 @@ import { consultationsApi } from '@/app/api/consultations';
 import { prescriptionsApi, MedicationItem } from '@/app/api/prescriptions';
 import { downloadProviderReportPdf, downloadPatientCheckUpPdf } from '@/app/lib/downloadReportPdf';
 import { referralsApi } from '@/app/api/referrals';
+import { getNearestPharmacies, NearestPharmacyDto, listPharmacies } from '@/app/api/pharmacist';
 import { Appointment, mapApiAppointment, ApiHealthRecordDto, ApiSlot, ApiSymptomReport, ProviderConsultationRow } from '@/app/types';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
@@ -151,6 +152,14 @@ export const DoctorPortal: React.FC<DoctorPortalProps> = ({ onNavigateToConsulta
   const [loadingEhrForRx, setLoadingEhrForRx] = useState(false);
   const [rxSignature, setRxSignature] = useState('');
 
+  // ── Nearest-pharmacy picker ────────────────────────────────────────────────
+  const [nearestPharmacies, setNearestPharmacies] = useState<NearestPharmacyDto[]>([]);
+  const [fetchingPharmacies, setFetchingPharmacies] = useState(false);
+  const [selectedPharmacyId, setSelectedPharmacyId] = useState('');
+  const [allPharmacies, setAllPharmacies] = useState<NearestPharmacyDto[]>([]);
+  const [pharmacySearch, setPharmacySearch] = useState('');
+  const [noNearestFound, setNoNearestFound] = useState(false);
+
   // ── Availability slots ─────────────────────────────────────────────────────
   const [mySlots, setMySlots] = useState<ApiSlot[]>([]);
   const [showWeeklyDialog, setShowWeeklyDialog] = useState(false);
@@ -221,6 +230,42 @@ export const DoctorPortal: React.FC<DoctorPortalProps> = ({ onNavigateToConsulta
     };
     load();
   }, []);
+
+  // ── Auto-fetch nearest pharmacies when delivery location changes ──────────
+  useEffect(() => {
+    const district = rxForm.deliveryDistrict.trim();
+    const sector   = rxForm.deliverySector.trim();
+    const cell     = rxForm.deliveryCell.trim();
+    const lat      = rxForm.deliveryLatitude  ? Number(rxForm.deliveryLatitude)  : undefined;
+    const lng      = rxForm.deliveryLongitude ? Number(rxForm.deliveryLongitude) : undefined;
+
+    if (!district && !sector && !cell && !lat && !lng) {
+      setNearestPharmacies([]);
+      setNoNearestFound(false);
+      setSelectedPharmacyId('');
+      setPharmacySearch('');
+      return;
+    }
+
+    const t = setTimeout(async () => {
+      setFetchingPharmacies(true);
+      try {
+        const results = await getNearestPharmacies({ district: district || undefined, sector: sector || undefined, cell: cell || undefined, lat, lng, limit: 5 });
+        const found = results ?? [];
+        setNearestPharmacies(found);
+        setNoNearestFound(found.length === 0);
+        setSelectedPharmacyId('');
+        setPharmacySearch('');
+      } catch {
+        setNearestPharmacies([]);
+        setNoNearestFound(true);
+      } finally {
+        setFetchingPharmacies(false);
+      }
+    }, 600);
+
+    return () => clearTimeout(t);
+  }, [rxForm.deliveryDistrict, rxForm.deliverySector, rxForm.deliveryCell, rxForm.deliveryLatitude, rxForm.deliveryLongitude]);
 
   // ── Derived data ───────────────────────────────────────────────────────────
   const todayStr = new Date().toISOString().slice(0, 10);
@@ -436,6 +481,7 @@ export const DoctorPortal: React.FC<DoctorPortalProps> = ({ onNavigateToConsulta
     try {
       const rx = await prescriptionsApi.issue({
         patientId: rxForm.patientId,
+        pharmacyId: selectedPharmacyId || undefined,
         medications: rxForm.medications,
         instructions: rxForm.instructions || undefined,
         validForDays: rxForm.validForDays,
@@ -449,6 +495,10 @@ export const DoctorPortal: React.FC<DoctorPortalProps> = ({ onNavigateToConsulta
       });
       setShowRxDialog(false);
       setRxSignature('');
+      setNearestPharmacies([]);
+      setSelectedPharmacyId('');
+      setPharmacySearch('');
+      setNoNearestFound(false);
       toast.success(
         rx.pharmacyName
           ? `Prescription issued — assigned to ${rx.pharmacyName}`
@@ -901,8 +951,8 @@ export const DoctorPortal: React.FC<DoctorPortalProps> = ({ onNavigateToConsulta
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5" />
-              Total Earnings
+              <Clock className="h-5 w-5" />
+              Avg. Consultation Duration
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -1535,7 +1585,19 @@ export const DoctorPortal: React.FC<DoctorPortalProps> = ({ onNavigateToConsulta
       </Dialog>
 
       {/* ── Issue Prescription Dialog ──────────────────────────────────────── */}
-      <Dialog open={showRxDialog} onOpenChange={setShowRxDialog}>
+      <Dialog open={showRxDialog} onOpenChange={(open) => {
+        setShowRxDialog(open);
+        if (open) {
+          if (allPharmacies.length === 0) {
+            listPharmacies().then(list => setAllPharmacies((list ?? []).map(p => ({ ...p, distanceKm: null, matchLevel: 'OTHER' as const }))));
+          }
+        } else {
+          setNearestPharmacies([]);
+          setSelectedPharmacyId('');
+          setPharmacySearch('');
+          setNoNearestFound(false);
+        }
+      }}>
         <DialogContent className="max-w-2xl w-full">
           <DialogHeader>
             <DialogTitle>{selectedTemplate ? `Issue Prescription — ${selectedTemplate}` : 'Issue Prescription'}</DialogTitle>
@@ -1707,6 +1769,115 @@ export const DoctorPortal: React.FC<DoctorPortalProps> = ({ onNavigateToConsulta
                     label="Delivery GPS (optional — improves pharmacy matching)"
                   />
                 </div>
+
+                {/* Pharmacy selector — nearest when location provided, search fallback otherwise */}
+                <div className="mt-2 space-y-1.5">
+                  {fetchingPharmacies ? (
+                    <p className="text-xs text-blue-700 flex items-center gap-1">
+                      <Loader2 className="h-3 w-3 animate-spin" /> Finding nearest pharmacies…
+                    </p>
+                  ) : nearestPharmacies.length > 0 ? (
+                    <>
+                      <Label className="text-xs font-semibold text-blue-700">
+                        Nearest pharmacies ({nearestPharmacies.length} found)
+                      </Label>
+                      <Select value={selectedPharmacyId} onValueChange={setSelectedPharmacyId}>
+                        <SelectTrigger className="bg-white">
+                          <SelectValue placeholder="Select a pharmacy (optional)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {nearestPharmacies.map(p => (
+                            <SelectItem key={p.pharmacyId} value={p.pharmacyId}>
+                              <div className="flex flex-col">
+                                <span className="font-medium">{p.name}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  {p.address}
+                                  {p.distanceKm != null ? ` · ${p.distanceKm.toFixed(1)} km` : ''}
+                                  {' · '}
+                                  <span className={
+                                    p.matchLevel === 'CELL' ? 'text-green-600' :
+                                    p.matchLevel === 'SECTOR' ? 'text-yellow-600' : 'text-muted-foreground'
+                                  }>
+                                    {p.matchLevel === 'CELL' ? 'Same cell' :
+                                     p.matchLevel === 'SECTOR' ? 'Same sector' :
+                                     p.matchLevel === 'DISTRICT' ? 'Same district' : 'Nearby'}
+                                  </span>
+                                </span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </>
+                  ) : (
+                    <>
+                      <Label className="text-xs font-semibold text-blue-700">
+                        {noNearestFound ? 'No nearby pharmacies found — search all pharmacies' : 'Assign pharmacy (optional)'}
+                      </Label>
+                      {/* Only show the search input when no pharmacy is selected yet */}
+                      {!selectedPharmacyId && (
+                        <>
+                          <Input
+                            placeholder="Type pharmacy name to search…"
+                            value={pharmacySearch}
+                            onChange={e => setPharmacySearch(e.target.value)}
+                            className="bg-white"
+                          />
+                          {pharmacySearch.trim().length >= 1 && (
+                            <div className="border rounded-md bg-white shadow-sm max-h-48 overflow-y-auto divide-y">
+                              {allPharmacies
+                                .filter(p => p.name.toLowerCase().includes(pharmacySearch.toLowerCase()) || p.address.toLowerCase().includes(pharmacySearch.toLowerCase()))
+                                .slice(0, 8)
+                                .map(p => (
+                                  <button
+                                    key={p.pharmacyId}
+                                    type="button"
+                                    className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 transition-colors"
+                                    onClick={() => { setSelectedPharmacyId(p.pharmacyId); setPharmacySearch(''); }}
+                                  >
+                                    <span className="font-medium">{p.name}</span>
+                                    <span className="block text-xs text-muted-foreground">{p.address}</span>
+                                  </button>
+                                ))}
+                              {allPharmacies.filter(p =>
+                                p.name.toLowerCase().includes(pharmacySearch.toLowerCase()) ||
+                                p.address.toLowerCase().includes(pharmacySearch.toLowerCase())
+                              ).length === 0 && (
+                                <p className="px-3 py-2 text-xs text-muted-foreground">No pharmacies match "{pharmacySearch}"</p>
+                              )}
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </>
+                  )}
+
+                  {selectedPharmacyId && (() => {
+                    const match =
+                      nearestPharmacies.find(p => p.pharmacyId === selectedPharmacyId) ||
+                      allPharmacies.find(p => p.pharmacyId === selectedPharmacyId);
+                    return (
+                      <div className="flex items-start justify-between gap-2 rounded-md bg-green-50 border border-green-200 px-3 py-2">
+                        <p className="text-xs text-green-700 flex items-center gap-1">
+                          <CheckCircle className="h-3 w-3 shrink-0" />
+                          <span><span className="font-semibold">{match?.name ?? 'Pharmacy'}</span> selected — prescription will be routed directly here.</span>
+                        </p>
+                        <button
+                          type="button"
+                          className="text-xs text-muted-foreground hover:text-red-500 shrink-0"
+                          onClick={() => setSelectedPharmacyId('')}
+                        >
+                          Change
+                        </button>
+                      </div>
+                    );
+                  })()}
+                  {!selectedPharmacyId && !fetchingPharmacies && nearestPharmacies.length > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      No pharmacy selected — the system will auto-route to the nearest one.
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -1740,7 +1911,7 @@ export const DoctorPortal: React.FC<DoctorPortalProps> = ({ onNavigateToConsulta
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowRxDialog(false); setRxSignature(''); setRxConflicts([]); setNewMed({ name: '', dosage: '', frequency: '', durationDays: 1 }); }}>Cancel</Button>
+            <Button variant="outline" onClick={() => { setShowRxDialog(false); setRxSignature(''); setRxConflicts([]); setNewMed({ name: '', dosage: '', frequency: '', durationDays: 1 }); setNearestPharmacies([]); setSelectedPharmacyId(''); setPharmacySearch(''); setNoNearestFound(false); }}>Cancel</Button>
             <Button
               onClick={handleIssuePrescription}
               disabled={issuingRx || !rxForm.patientId || rxSignature.trim() !== (user?.name ?? '').trim()}

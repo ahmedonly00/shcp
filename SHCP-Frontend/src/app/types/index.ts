@@ -385,10 +385,20 @@ export interface ProviderConsultationRow {
 
 export interface ApiPatientHealthSummary {
   patientId: string;
-  totalAppointments: number;
+  appointments: {
+    total: number;
+    pending: number;
+    confirmed: number;
+    inProgress: number;
+    completed: number;
+    cancelled: number;
+    noShow: number;
+  };
   upcomingAppointments: number;
+  totalConsultations: number;
   lastConsultationDate?: string;
   activePrescriptions: number;
+  totalPrescriptions: number;
   totalSymptomReports: number;
 }
 

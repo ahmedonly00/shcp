@@ -149,12 +149,12 @@ export const PatientDashboard: React.FC = () => {
 
   const handleDownloadRx = async (recordId: string) => {
     const rx = rawPrescriptions.find(r => r.prescriptionId === recordId);
-    if (!rx) { toast.error('Prescription data not available'); return; }
+    if (!rx) { toast.error(t('dashboard.rxDataUnavailable')); return; }
     setDownloadingRxId(recordId);
     try {
       await downloadPrescriptionPdf(rx);
     } catch {
-      toast.error('Could not generate PDF — please try again');
+      toast.error(t('dashboard.pdfError'));
     } finally {
       setDownloadingRxId(null);
     }
@@ -198,12 +198,12 @@ export const PatientDashboard: React.FC = () => {
   };
 
   const handleAddVital = () => {
-    if (!newVital.value) { toast.error('Please enter a value'); return; }
+    if (!newVital.value) { toast.error(t('dashboard.enterVitalValue')); return; }
     setVitals(prev => {
       const updated = prev.filter(v => v.type !== newVital.type);
       return [...updated, { type: newVital.type as VitalSignType['type'], value: newVital.value, unit: newVital.unit, date: new Date().toISOString().split('T')[0] }];
     });
-    toast.success('Vital sign saved locally');
+    toast.success(t('dashboard.vitalSavedLocally'));
     setShowAddVitalDialog(false);
     setNewVital({ type: 'heart-rate', value: '', unit: 'bpm' });
   };
@@ -259,9 +259,9 @@ export const PatientDashboard: React.FC = () => {
               <div>
                 <p className="text-sm text-muted-foreground">{t('dashboard.prescriptions')}</p>
                 <p className="text-2xl font-bold">
-                  {summary?.activePrescriptions ?? prescriptions.length}
+                  {summary?.totalPrescriptions ?? prescriptions.length}
                 </p>
-                <p className="text-xs text-muted-foreground">{t('dashboard.active')}</p>
+                <p className="text-xs text-muted-foreground">{t('dashboard.issued')}</p>
               </div>
               <div className="h-12 w-12 bg-green-100 rounded-full flex items-center justify-center">
                 <FileText className="h-6 w-6 text-green-600" />
@@ -276,7 +276,7 @@ export const PatientDashboard: React.FC = () => {
               <div>
                 <p className="text-sm text-muted-foreground">{t('dashboard.totalAppointments')}</p>
                 <p className="text-2xl font-bold">
-                  {summary?.totalAppointments ?? 0}
+                  {summary?.appointments?.total ?? 0}
                 </p>
                 <p className="text-xs text-muted-foreground">{t('dashboard.allTime')}</p>
               </div>
@@ -336,8 +336,8 @@ export const PatientDashboard: React.FC = () => {
                   <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }} axisLine={{ stroke: 'var(--border)' }} tickLine={false} />
                   <YAxis tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} />
                   <Tooltip contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '12px' }} />
-                  <Line type="monotone" dataKey="heartRate" stroke="var(--destructive)" strokeWidth={2} dot={false} name="Heart Rate" />
-                  <Line type="monotone" dataKey="bloodPressure" stroke="var(--chart-1)" strokeWidth={2} dot={false} name="Blood Pressure" />
+                  <Line type="monotone" dataKey="heartRate" stroke="var(--destructive)" strokeWidth={2} dot={false} name={t('dashboard.heartRate')} />
+                  <Line type="monotone" dataKey="bloodPressure" stroke="var(--chart-1)" strokeWidth={2} dot={false} name={t('dashboard.bloodPressure')} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -384,14 +384,14 @@ export const PatientDashboard: React.FC = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-cyan-800">
               <Bike className="h-5 w-5 text-cyan-600 animate-pulse" />
-              Your medication is on its way!
+              {t('dashboard.medicationOnItsWay')}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Status row */}
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Biker:</span>
+                <span className="text-sm text-muted-foreground">{t('dashboard.biker')}</span>
                 <span className="font-medium text-sm text-foreground">{activeDelivery.bikerName ?? "—"}</span>
               </div>
               <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
@@ -405,7 +405,7 @@ export const PatientDashboard: React.FC = () => {
             {/* Last GPS update time */}
             {activeDelivery.locationUpdatedAt && (
               <p className="text-xs text-muted-foreground/70">
-                Biker location last updated:{' '}
+                {t('dashboard.bikerLocationUpdated')}{' '}
                 {new Date(activeDelivery.locationUpdatedAt).toLocaleTimeString()}
               </p>
             )}
@@ -422,7 +422,7 @@ export const PatientDashboard: React.FC = () => {
                   activeDelivery.bikerLongitude,
                   activeDelivery.destinationLatitude,
                   activeDelivery.destinationLongitude,
-                ).toFixed(1)}{' '}km away
+                ).toFixed(1)}{' '}{t('dashboard.kmAway')}
               </div>
             )}
 
@@ -432,7 +432,7 @@ export const PatientDashboard: React.FC = () => {
               {activeDelivery.bikerLatitude != null && activeDelivery.bikerLongitude != null ? (
                 <div className="rounded-lg overflow-hidden border border-cyan-200 bg-card">
                   <p className="text-xs font-medium text-cyan-700 px-3 py-1.5 border-b border-cyan-100 flex items-center gap-1.5">
-                    <Bike className="h-3.5 w-3.5" /> Biker's current location
+                    <Bike className="h-3.5 w-3.5" /> {t('dashboard.bikerCurrentLocation')}
                   </p>
                   <iframe
                     title="Biker location"
@@ -445,7 +445,7 @@ export const PatientDashboard: React.FC = () => {
               ) : (
                 <div className="rounded-lg border border-dashed border-cyan-200 h-48 flex flex-col items-center justify-center gap-1 text-xs text-muted-foreground/70">
                   <Bike className="h-6 w-6 opacity-40" />
-                  <span>Waiting for biker's GPS…</span>
+                  <span>{t('dashboard.waitingForGps')}</span>
                 </div>
               )}
 
@@ -453,7 +453,7 @@ export const PatientDashboard: React.FC = () => {
               {activeDelivery.destinationLatitude != null && activeDelivery.destinationLongitude != null ? (
                 <div className="rounded-lg overflow-hidden border border-border bg-card">
                   <p className="text-xs font-medium text-muted-foreground px-3 py-1.5 border-b border-border flex items-center gap-1.5">
-                    <MapPin className="h-3.5 w-3.5" /> Your delivery address
+                    <MapPin className="h-3.5 w-3.5" /> {t('dashboard.yourDeliveryAddress')}
                   </p>
                   <iframe
                     title="Delivery address"
@@ -466,7 +466,7 @@ export const PatientDashboard: React.FC = () => {
               ) : activeDelivery.deliveryAddress ? (
                 <div className="rounded-lg border border-border bg-card p-4">
                   <p className="text-xs font-medium text-muted-foreground mb-1 flex items-center gap-1.5">
-                    <MapPin className="h-3.5 w-3.5" /> Your delivery address
+                    <MapPin className="h-3.5 w-3.5" /> {t('dashboard.yourDeliveryAddress')}
                   </p>
                   <p className="text-sm text-foreground">{activeDelivery.deliveryAddress}</p>
                 </div>
@@ -485,9 +485,9 @@ export const PatientDashboard: React.FC = () => {
                 <Pill className="h-5 w-5 text-indigo-600" />
               </div>
               <div>
-                <p className="font-semibold text-indigo-800">Your medication is ready at the pharmacy</p>
+                <p className="font-semibold text-indigo-800">{t('dashboard.readyAtPharmacy')}</p>
                 <p className="text-sm text-indigo-700 mt-0.5">
-                  The pharmacist has prepared your prescription. A delivery agent will be assigned shortly.
+                  {t('dashboard.preparingDelivery')}
                 </p>
               </div>
             </div>
@@ -501,16 +501,16 @@ export const PatientDashboard: React.FC = () => {
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-red-800 text-base">
               <AlertCircle className="h-5 w-5 text-red-600" />
-              Delivery could not be completed
+              {t('dashboard.deliveryFailed')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-red-700">
               {activeDelivery.status === 'DECLINED'
-                ? 'The assigned delivery agent declined this order. Your pharmacy is arranging a replacement.'
+                ? t('dashboard.deliveryDeclined')
                 : activeDelivery.failureReason
-                  ? `Reason: ${activeDelivery.failureReason}`
-                  : 'The delivery attempt was unsuccessful. Your pharmacy will arrange a new delivery.'}
+                  ? `${t('dashboard.reason')} ${activeDelivery.failureReason}`
+                  : t('dashboard.deliveryUnsuccessful')}
             </p>
           </CardContent>
         </Card>
@@ -613,33 +613,33 @@ export const PatientDashboard: React.FC = () => {
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Type</Label>
+              <Label>{t('dashboard.vitalType')}</Label>
               <Select value={newVital.type} onValueChange={v => setNewVital({ ...newVital, type: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="heart-rate">Heart Rate</SelectItem>
-                  <SelectItem value="blood-pressure">Blood Pressure</SelectItem>
-                  <SelectItem value="temperature">Temperature</SelectItem>
-                  <SelectItem value="oxygen">Oxygen Saturation</SelectItem>
-                  <SelectItem value="weight">Weight</SelectItem>
-                  <SelectItem value="glucose">Blood Glucose</SelectItem>
+                  <SelectItem value="heart-rate">{t('dashboard.heartRate')}</SelectItem>
+                  <SelectItem value="blood-pressure">{t('dashboard.bloodPressure')}</SelectItem>
+                  <SelectItem value="temperature">{t('dashboard.temperature')}</SelectItem>
+                  <SelectItem value="oxygen">{t('dashboard.oxygenSaturation')}</SelectItem>
+                  <SelectItem value="weight">{t('dashboard.weight')}</SelectItem>
+                  <SelectItem value="glucose">{t('dashboard.bloodGlucose')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Value</Label>
-              <Input type="text" placeholder="e.g. 72" value={newVital.value}
+              <Label>{t('dashboard.vitalValue')}</Label>
+              <Input type="text" placeholder={t('dashboard.valuePlaceholder')} value={newVital.value}
                 onChange={e => setNewVital({ ...newVital, value: e.target.value })} />
             </div>
             <div className="space-y-2">
-              <Label>Unit</Label>
-              <Input type="text" placeholder="e.g. bpm" value={newVital.unit}
+              <Label>{t('dashboard.vitalUnit')}</Label>
+              <Input type="text" placeholder={t('dashboard.unitPlaceholder')} value={newVital.unit}
                 onChange={e => setNewVital({ ...newVital, unit: e.target.value })} />
             </div>
           </div>
           <div className="mt-6 flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setShowAddVitalDialog(false)}>Cancel</Button>
-            <Button onClick={handleAddVital}>Add Vital</Button>
+            <Button variant="outline" onClick={() => setShowAddVitalDialog(false)}>{t('common.cancel')}</Button>
+            <Button onClick={handleAddVital}>{t('dashboard.addVital')}</Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -648,12 +648,12 @@ export const PatientDashboard: React.FC = () => {
       <Dialog open={showAllRecordsDialog} onOpenChange={setShowAllRecordsDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>All Prescriptions</DialogTitle>
-            <DialogDescription>Your complete prescription history.</DialogDescription>
+            <DialogTitle>{t('dashboard.allPrescriptions')}</DialogTitle>
+            <DialogDescription>{t('dashboard.prescriptionHistory')}</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 max-h-96 overflow-y-auto">
             {prescriptions.length === 0 ? (
-              <p className="text-center text-muted-foreground py-4">No prescriptions found.</p>
+              <p className="text-center text-muted-foreground py-4">{t('dashboard.noPrescriptionsFound')}</p>
             ) : prescriptions.map((record) => {
               const raw = rawPrescriptions.find(r => r.prescriptionId === record.id);
               let medCount = 0;
@@ -686,7 +686,7 @@ export const PatientDashboard: React.FC = () => {
                         {raw?.pharmacyName && ` · ${raw.pharmacyName}`}
                       </p>
                       {raw?.validUntil && (
-                        <p className="text-xs text-muted-foreground/70">Valid until: {raw.validUntil}</p>
+                        <p className="text-xs text-muted-foreground/70">{t('dashboard.validUntil')} {raw.validUntil}</p>
                       )}
                     </div>
                   </div>
@@ -708,7 +708,7 @@ export const PatientDashboard: React.FC = () => {
             })}
           </div>
           <div className="mt-4 flex justify-end">
-            <Button variant="outline" onClick={() => setShowAllRecordsDialog(false)}>Close</Button>
+            <Button variant="outline" onClick={() => setShowAllRecordsDialog(false)}>{t('common.close')}</Button>
           </div>
         </DialogContent>
       </Dialog>

@@ -90,6 +90,11 @@ export default defineConfig({
       devOptions: {
         enabled: false,
       },
+      rollupOptions: {
+        external: (id: string, importer: string | undefined) =>
+          id.includes('node_modules') ||
+          (!!importer && importer.includes('node_modules')),
+      },
     }),
   ],
   resolve: {

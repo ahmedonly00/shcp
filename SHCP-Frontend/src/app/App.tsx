@@ -166,6 +166,7 @@ const MainApp: React.FC = () => {
         description: body,
         duration: 6000,
       });
+      window.dispatchEvent(new Event('shcp:new-notification'));
     });
     return unsubscribe;
   }, []);
@@ -249,7 +250,7 @@ const MainApp: React.FC = () => {
     { id: "appointments" as View, icon: <Calendar className="h-5 w-5" />, label: t('nav.appointments') },
     { id: "teleconsultation" as View, icon: <Video className="h-5 w-5" />, label: t('nav.teleconsultation') },
     { id: "health-records" as View, icon: <FileText className="h-5 w-5" />, label: t('nav.healthRecords') },
-    { id: "prescriptions" as View, icon: <Pill className="h-5 w-5" />, label: 'Prescriptions' },
+    { id: "prescriptions" as View, icon: <Pill className="h-5 w-5" />, label: t('nav.prescriptions') },
     { id: "mobile-health" as View, icon: <Smartphone className="h-5 w-5" />, label: t('nav.mobileHealth') },
     { id: "notifications" as View, icon: <Bell className="h-5 w-5" />, label: t('nav.notifications'), badge: 2 },
   ];
@@ -258,25 +259,25 @@ const MainApp: React.FC = () => {
     { id: "doctor-portal"    as View, icon: <Stethoscope className="h-5 w-5" />, label: t('nav.doctorPortal') },
     { id: "appointments"     as View, icon: <Calendar className="h-5 w-5" />,    label: t('nav.appointments') },
     { id: "teleconsultation" as View, icon: <Video className="h-5 w-5" />,       label: t('nav.consultation') },
-    { id: "prescriptions"    as View, icon: <Pill className="h-5 w-5" />,        label: 'Prescriptions' },
-    { id: "provider-reports" as View, icon: <FileText className="h-5 w-5" />,   label: 'Reports' },
+    { id: "prescriptions"    as View, icon: <Pill className="h-5 w-5" />,        label: t('nav.prescriptions') },
+    { id: "provider-reports" as View, icon: <FileText className="h-5 w-5" />,   label: t('nav.reports') },
     { id: "notifications"    as View, icon: <Bell className="h-5 w-5" />,        label: t('nav.notifications'), badge: 3 },
   ];
 
   const adminMenuItems: MenuItem[] = [
     { id: "analytics"     as View, icon: <BarChart className="h-5 w-5" />,   label: t('nav.analytics') },
-    { id: "pharmacies"    as View, icon: <Building2 className="h-5 w-5" />,  label: "Pharmacies" },
-    { id: "admin-reports" as View, icon: <FileText className="h-5 w-5" />,   label: 'Reports' },
+    { id: "pharmacies"    as View, icon: <Building2 className="h-5 w-5" />,  label: t('nav.pharmacies') },
+    { id: "admin-reports" as View, icon: <FileText className="h-5 w-5" />,   label: t('nav.reports') },
     { id: "notifications" as View, icon: <Bell className="h-5 w-5" />,       label: t('nav.notifications') },
   ];
 
   const pharmacistMenuItems: MenuItem[] = [
-    { id: "pharmacist-dashboard" as View, icon: <Package className="h-5 w-5" />, label: "Pharmacy Dashboard" },
+    { id: "pharmacist-dashboard" as View, icon: <Package className="h-5 w-5" />, label: t('nav.pharmacyDashboard') },
     { id: "notifications" as View, icon: <Bell className="h-5 w-5" />, label: t('nav.notifications') },
   ];
 
   const bikerMenuItems: MenuItem[] = [
-    { id: "biker-dashboard" as View, icon: <Bike className="h-5 w-5" />, label: "Delivery Dashboard" },
+    { id: "biker-dashboard" as View, icon: <Bike className="h-5 w-5" />, label: t('nav.deliveryDashboard') },
     { id: "notifications" as View, icon: <Bell className="h-5 w-5" />, label: t('nav.notifications') },
   ];
 

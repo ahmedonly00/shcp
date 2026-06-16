@@ -41,10 +41,19 @@ export const Notifications: React.FC = () => {
   });
 
   useEffect(() => {
-    notificationsApi.getMyNotifications()
-      .then(list => setNotifications((list ?? []).map(mapApiNotification)))
-      .catch(() => { /* silently ignore */ })
-      .finally(() => setLoading(false));
+    const fetch = () =>
+      notificationsApi.getMyNotifications()
+        .then(list => setNotifications((list ?? []).map(mapApiNotification)))
+        .catch(() => {})
+        .finally(() => setLoading(false));
+
+    fetch();
+    const interval = setInterval(fetch, 30_000);
+    window.addEventListener('shcp:new-notification', fetch);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('shcp:new-notification', fetch);
+    };
   }, []);
 
   const unreadCount = notifications.filter(n => !n.read).length;
