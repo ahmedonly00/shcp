@@ -1,88 +1,81 @@
 # SHCP - Smart Health Consultation Platform
 
-A full-stack telemedicine and healthcare management platform designed to improve access to healthcare through digital consultation workflows. SHCP connects patients, providers, and administrators in a single system that supports appointment booking, remote consultation, AI-assisted symptom triage, prescription management, and automated notifications.
+A full-stack telemedicine platform designed to improve healthcare access by connecting patients, healthcare providers, and administrators in a unified digital workflow. The system supports appointment booking, AI-assisted symptom triage, real-time virtual consultation, digital prescriptions, secure authentication, and automated notifications.
 
-The platform was built to demonstrate professional software engineering practices in a healthcare context, combining a modern frontend, a modular backend, multi-service architecture, and secure data handling.
-
----
-
-## Project vision
-
-Healthcare delivery is often slowed by fragmented communication, delayed access to providers, and inefficient manual workflows. SHCP addresses these challenges by creating a unified digital healthcare platform that streamlines patient care and operational coordination.
-
-The solution is designed to:
-
-- simplify appointment booking and scheduling
-- enable remote consultation between patients and providers
-- support AI-based urgency assessment for symptom reports
-- centralize patient records and prescriptions
-- improve patient engagement through reminders and notifications
-- provide a scalable architecture for real-world healthcare systems
+This project was designed as a realistic healthcare software system that combines frontend engineering, backend development, AI integration, event-driven messaging, real-time communication, and containerized deployment. It demonstrates system design thinking, modular service separation, and the ability to build a production-like platform around a meaningful use case.
 
 ---
 
-## Core features
+## Problem statement
 
-### Patient features
-- secure registration and login
-- profile management
-- provider search and availability view
-- appointment booking and scheduling
-- AI-powered symptom analysis and urgency detection
-- consultation history and digital medical records
-- prescription access and follow-up reminders
+Traditional healthcare delivery often suffers from fragmented workflows, delayed scheduling, limited remote access, and poor coordination between patients and providers. SHCP addresses these issues by creating a digital healthcare platform that centralizes core operations such as appointment flow, symptom evaluation, consultation management, and communications.
 
-### Provider features
-- provider profile and availability management
-- appointment review and confirmation
-- consultation lifecycle management
-- prescription issuance
-- patient history review and clinical workflow support
-- digital communication with patients during consultations
+The project is built around the need to:
 
-### Administrative features
-- user and role management
-- system monitoring and operational oversight
-- analytics and reporting support
-- healthcare workflow visibility across the platform
-
-### Platform features
-- JWT-based authentication and authorization
-- WebRTC-based video consultation setup
-- real-time signaling via Socket.IO
-- notification delivery through SMS, email, and push channels
-- event-driven communication with RabbitMQ
-- Docker-based deployment and service orchestration
+- reduce delays in patient care access
+- enable remote digital consultations
+- automate routine healthcare communication
+- improve provider efficiency and patient engagement
+- support AI-assisted triage for early clinical prioritization
 
 ---
 
-## Architecture
+## Project goals
 
-SHCP follows a hybrid architecture that combines a modular monolith with independent supporting services.
+- build a role-based healthcare platform for patients, providers, and admins
+- support appointment booking and schedule coordination
+- provide AI-assisted symptom analysis and risk prioritization
+- enable real-time video consultation through WebRTC signaling
+- manage patient records, appointments, and prescriptions digitally
+- implement secure authentication and authorization
+- support notifications using async messaging patterns
+- deploy the system through a containerized multi-service architecture
 
-### Components
-- Core backend: Java + Spring Boot
-- Frontend: React + Vite
-- AI service: Python + Flask
-- Real-time signaling: Node.js + Socket.IO
-- Database: PostgreSQL
-- Cache and token storage: Redis
-- Message broker: RabbitMQ
-- Deployment: Docker Compose
+---
 
-### High-level architecture
+## Why this project is technically strong
+
+This project is not just a CRUD app. It combines multiple engineering concerns in one system:
+
+- a full-stack application with separate frontend and backend layers
+- asynchronous event-driven communication via RabbitMQ
+- real-time communication using WebRTC and Socket.IO
+- AI integration through a dedicated Python microservice
+- secure JWT-based authentication and token validation
+- shared PostgreSQL persistence with domain-driven data modeling
+- Docker-based orchestration for multi-service deployment
+- role-based healthcare workflows and data separation
+
+This makes it a strong project for technical interviews, portfolio review, and software engineering discussions because it demonstrates practical system design and implementation across several domains.
+
+---
+
+## System architecture
+
+SHCP follows a hybrid architecture that blends a modular monolith with independent services for specialized functionality.
+
+### Architectural style
+
+- Spring Boot core API acts as the main business application
+- AI analysis is delegated to a dedicated Python Flask service
+- real-time consultation signaling is handled by a Node.js server
+- notification delivery is handled asynchronously through RabbitMQ
+- Postgres provides the centralized transactional data layer
+- Redis supports authentication flow, OTP, token state, and rate limiting
+- Docker Compose orchestrates all services for local deployment
+
+### High-level architecture diagram
 
 ```text
-React Frontend
+Client App (React)
       |
       v
 Spring Boot Core API
-   |-- Authentication
-   |-- Users & Roles
+   |-- Auth / Users / Roles
    |-- Appointments
    |-- Consultations
-   |-- Symptoms & EHR
-   |-- Prescriptions
+   |-- Symptom Analysis
+   |-- EHR / Prescriptions
    |-- Notifications
    |
    +--> Python AI Service
@@ -90,210 +83,380 @@ Spring Boot Core API
    +--> RabbitMQ
             |
             v
-   Notification Consumer
+   Notification Consumer (Spring Boot)
             |
             +--> SMS / Email / Push
 ```
 
-This design decouples business logic, AI processing, real-time communication, and notifications while preserving a shared data layer and centralized user management.
-
 ---
 
-## Technology stack
+## Core services and responsibilities
 
-### Frontend
-- React
-- Vite
-- TypeScript
-- Material UI / Emotion
-- Axios
-- Firebase integration support
+### 1. Core API (Spring Boot)
+The central backend application is responsible for all primary business logic.
 
-### Backend
-- Java 21
-- Spring Boot 3.x
-- Spring Security
-- Spring Data JPA / Hibernate
-- PostgreSQL JDBC
-- JWT
-
-### AI and analytics
-- Python
-- Flask
-- spaCy
-- TensorFlow
-- scikit-learn
-
-### Real-time communication
-- Node.js
-- Express
-- Socket.IO
-- WebRTC
-
-### Messaging and infrastructure
-- Redis
-- RabbitMQ
-- Docker
-- Docker Compose
-- PostgreSQL 15
-
----
-
-## Data model
-
-The project uses PostgreSQL with a role-based healthcare data model.
-
-### Key entities
-- `users` — shared identity and authentication data
-- `patients` — patient profile and record information
-- `providers` — medical provider profile and specialization data
-- `admins` — administrative user records
-- `availability` — provider schedule/time slots
-- `appointments` — patient-provider booking records
-- `consultations` — consultation session details
-- `prescriptions` — digital prescriptions issued after consultation
-- `symptom_reports` — symptom input and AI assessment results
-- `health_records` — patient medical history and related structured data
-- `notifications` — delivery activity and message audit log
-
-### Design principles
-- shared identity model across user roles
-- role-based data extension using one-to-one relationships
-- strong appointment scheduling controls and double-booking protection
-- JSONB for flexible healthcare data structures
-- event-driven notification processing
-
----
-
-## Security and reliability
-
-The platform incorporates production-oriented engineering practices to support secure operation:
-
-- BCrypt password hashing
-- JWT-based authentication and token rotation
-- Redis-backed refresh token and rate-limit enforcement
+Responsibilities:
+- user authentication and authorization
 - role-based access control
-- environment-based secret management
-- health checks for running services
-- Docker Compose orchestration for scalable local deployment
+- patient and provider profile management
+- appointment creation, confirmation, and status updates
+- consultation lifecycle transitions
+- symptom report processing and persistence
+- EHR and prescription management
+- analytics and operational reporting
+- publishing notification events to the broker
+
+This component acts as the main system orchestrator and business domain hub.
+
+### 2. AI Service (Python + Flask)
+The AI service handles medical triage intelligence.
+
+Responsibilities:
+- receive symptom text and body-map inputs
+- detect language and extract relevant clinical signals
+- classify urgency levels such as low, moderate, urgent, or emergency
+- return recommended action and self-care guidance
+- operate independently from the main backend for resilience
+
+This service allows the platform to perform intelligent assessment without tightly coupling symptom analysis logic to the core Java application.
+
+### 3. Signaling Server (Node.js + Socket.IO)
+This service enables real-time peer communication for video consultations.
+
+Responsibilities:
+- handle WebRTC signaling messages
+- validate JWT tokens for room access
+- relay offer/answer/ICE candidate traffic between peers
+- manage room membership and session lifecycle
+
+The signaling layer is responsible for connection coordination rather than actual media transmission, which remains peer-to-peer.
+
+### 4. Notification Consumer (Spring Boot)
+This service consumes notification messages and performs delivery tasks.
+
+Responsibilities:
+- consume events from RabbitMQ
+- identify channel type (SMS, email, push)
+- fetch recipient details from the database
+- call third-party providers or messaging services
+- log status and retry results
+- support downstream monitoring and audit trails
+
+This separation ensures the user-facing API remains responsive and does not block on slow external delivery systems.
 
 ---
 
-## Why this project is relevant for jobs
+## Key features
 
-SHCP is a strong example of a full-stack software solution that combines product thinking, backend engineering, AI integration, and systems design. It demonstrates practical skills in:
+### Patient features
+- secure registration and login
+- profile management
+- provider search and availability browsing
+- appointment booking and confirmation
+- symptom submission and AI-based urgency detection
+- access to consultation records, prescriptions, and history
+- appointment reminder notifications
 
-- building modular and maintainable backend services
-- integrating frontend and backend systems
-- developing real-time communication features
-- implementing secure authentication and authorization
-- working with event-driven architectures
-- deploying multi-service applications with Docker
-- designing domain-driven healthcare workflows
+### Provider features
+- provider availability and schedule management
+- patient appointment review
+- consultation start/end workflow
+- digital prescription issuance
+- medical history access and review
+- patient communication during active consultations
 
-This makes the project highly relevant for roles in:
+### Admin features
+- user and role management
+- operational visibility
+- usage analytics and platform monitoring
+- system-level oversight across services
 
-- software engineering
-- full-stack development
-- backend engineering
-- cloud and infrastructure
-- AI-integrated product development
-- healthcare technology systems
-
----
-
-## Repository structure
-
-```text
-shcp/
-├── .env.example
-├── .github/
-├── README.md
-├── RUNNING.md
-├── SEEDED_ACCOUNTS.md
-├── docker-compose.yml
-├── docs/
-│   └── SHCP-Architecture-and-ERD.md
-├── SHCP-Backend/
-├── SHCP-Frontend/
-├── ai-service/
-├── notification-consumer/
-├── signaling/
-├── coturn/
-├── secrets/
-└── ...
-```
+### Platform features
+- JWT-based authentication
+- role-based access control
+- real-time consultation handling
+- asynchronous message-driven processing
+- cloud-ready Docker deployment
+- centralized healthcare data persistence
 
 ---
 
-## Local setup
+## Database design
 
-### Prerequisites
-- Docker Desktop
-- Git
-- Java 21
-- Python 3.11
-- Node.js
+The application uses PostgreSQL as the system of record. The schema is designed around healthcare workflows and role-based access.
 
-### Environment configuration
-Create a `.env` file based on `.env.example` and configure the necessary values for:
+### Core tables
 
-- database credentials
-- JWT secret
-- Redis password
-- RabbitMQ password
-- email credentials
-- Firebase credentials
-- TURN server configuration
+#### users
+Stores shared identity data for every user.
 
-### Run the project
-```bash
-docker compose up --build -d
-```
+| Column | Type | Description |
+|---|---|---|
+| user_id | UUID / PK | unique user identifier |
+| name | VARCHAR | user's full name |
+| email | VARCHAR | login identifier |
+| phone | VARCHAR | contact number |
+| password_hash | VARCHAR | encrypted password |
+| role | VARCHAR | PATIENT / PROVIDER / ADMIN |
+| is_verified | BOOLEAN | account verification status |
+| device_token | VARCHAR | push notification token |
+| created_at | TIMESTAMP | created date |
+| updated_at | TIMESTAMP | last update date |
 
-### Check status
-```bash
-docker compose ps
-```
+#### patients
+Stores patient-specific data linked to users.
 
-### Stop the project
-```bash
-docker compose down
-```
+| Column | Type | Description |
+|---|---|---|
+| user_id | UUID / PK, FK | same identity as users.user_id |
+| date_of_birth | DATE | date of birth |
+| gender | VARCHAR | gender |
+| blood_group | VARCHAR | blood type |
+| address | TEXT | physical address |
+| emergency_contact | JSONB | emergency contact info |
+
+#### providers
+Stores provider profile information.
+
+| Column | Type | Description |
+|---|---|---|
+| user_id | UUID / PK, FK | provider identity |
+| specialty | VARCHAR | medical specialty |
+| license_number | VARCHAR | professional license |
+| bio | TEXT | provider biography |
+| consultation_fee | DECIMAL | consultation price |
+| rating | DECIMAL | provider rating |
+| is_active | BOOLEAN | active availability status |
+| years_experience | INTEGER | experience level |
+
+#### availability
+Represents provider time slots.
+
+| Column | Type | Description |
+|---|---|---|
+| slot_id | UUID / PK | unique slot identifier |
+| provider_id | UUID / FK | associated provider |
+| start_time | TIMESTAMPTZ | slot opening time |
+| end_time | TIMESTAMPTZ | slot closing time |
+| is_booked | BOOLEAN | whether slot has been reserved |
+
+#### appointments
+Represents patient-provider booking records.
+
+| Column | Type | Description |
+|---|---|---|
+| appointment_id | UUID / PK | appointment identifier |
+| patient_id | UUID / FK | patient |
+| provider_id | UUID / FK | provider |
+| slot_id | UUID / FK | assigned time slot |
+| scheduled_at | TIMESTAMPTZ | scheduled date and time |
+| status | VARCHAR | pending / confirmed / completed / cancelled |
+| fee | DECIMAL | appointment fee |
+| payment_status | VARCHAR | paid / pending / waived |
+
+#### consultations
+Stores consultation sessions linked to appointments.
+
+| Column | Type | Description |
+|---|---|---|
+| consultation_id | UUID / PK | consultation ID |
+| appointment_id | UUID / FK | linked appointment |
+| video_room_id | VARCHAR | generated room key |
+| started_at | TIMESTAMPTZ | consultation start time |
+| ended_at | TIMESTAMPTZ | consultation end time |
+| duration_minutes | INTEGER | session duration |
+| notes | TEXT | clinician notes |
+| diagnosis | TEXT | diagnosis summary |
+| status | VARCHAR | waiting / in_progress / completed |
+
+#### prescriptions
+Stores digital prescriptions issued by providers.
+
+| Column | Type | Description |
+|---|---|---|
+| prescription_id | UUID / PK | unique prescription |
+| consultation_id | UUID / FK | linked consultation |
+| issued_by | UUID / FK | provider who issued it |
+| patient_id | UUID / FK | patient |
+| medications | JSONB | list of prescribed medications |
+| valid_until | DATE | expiry date |
+| issued_at | TIMESTAMPTZ | issue timestamp |
+
+#### symptom_reports
+Stores symptom submissions and AI analysis results.
+
+| Column | Type | Description |
+|---|---|---|
+| report_id | UUID / PK | unique report ID |
+| patient_id | UUID / FK | patient |
+| symptom_text | TEXT | raw symptom description |
+| symptoms | JSONB | extracted symptom list |
+| language | VARCHAR | language of submitted text |
+| ai_urgency | VARCHAR | urgency classification |
+| ai_pathway | VARCHAR | recommended care route |
+| ai_confidence | DECIMAL | model confidence |
+| ai_raw_response | JSONB | full AI result payload |
+| created_at | TIMESTAMPTZ | report timestamp |
+
+#### health_records
+Stores structured patient health history.
+
+| Column | Type | Description |
+|---|---|---|
+| record_id | UUID / PK | health record ID |
+| patient_id | UUID / FK | patient identity |
+| diagnoses | JSONB | diagnosis history |
+| medications | JSONB | current medicine record |
+| allergies | JSONB | allergy data |
+| vitals | JSONB | health measurements |
+| documents | JSONB | uploaded records |
+
+#### notifications
+Stores the delivery audit trail for all outbound messages.
+
+| Column | Type | Description |
+|---|---|---|
+| notification_id | UUID / PK | unique notification record |
+| user_id | UUID / FK | recipient |
+| type | VARCHAR | event type |
+| channel | VARCHAR | SMS / EMAIL / PUSH |
+| message | TEXT | message body |
+| status | VARCHAR | sent / failed / pending |
+| retry_count | INTEGER | retry attempts |
+| sent_at | TIMESTAMPTZ | delivery timestamp |
+| metadata | JSONB | event-related metadata |
+
+### Design notes
+- `users` acts as the root identity table for all roles
+- role-specific tables extend the core user identity
+- `appointments` are central to the healthcare workflow
+- `consultations` are linked to appointments in a one-to-one relationship
+- `symptom_reports` are independent from appointments and can be submitted outside booking flow
+- `notifications` serve as an audit system for outbound communication
+- JSONB is used for flexible records such as allergies, vitals, symptoms, and metadata
 
 ---
 
-## Access points
+## Security design
 
-| Service | URL |
-|--------|-----|
-| Frontend | http://localhost |
-| Backend API | http://localhost:8082 |
-| API Health | http://localhost:8082/actuator/health |
-| Signaling Server | http://localhost:3001/health |
+Security is a core part of the platform and was designed for a real healthcare workflow.
+
+### Authentication flow
+- user registers and verifies account identity
+- password is stored using BCrypt hashing
+- JWT tokens are issued on login
+- refresh tokens are stored and validated in Redis
+- refresh token rotation prevents replay attacks
+- logout invalidates the active session token state
+
+### Authorization model
+- endpoints are protected based on role and permission requirements
+- patient, provider, and admin flows are isolated by access control rules
+- ownership checks ensure users can only access the data they are allowed to access
+
+### Additional security practices
+- environment-based configuration for credentials and secrets
+- Redis-backed rate limiting for repeated failed authentication attempts
+- service-level isolation for sensitive operations
+- CORS configuration to restrict allowed origins
 
 ---
 
-## Project impact
+## Messaging and async workflows
 
-SHCP demonstrates a realistic healthcare platform built with modern engineering practices and multi-service architecture. It combines patient-centered functionality with strong technical implementation, making it a compelling project to present in a portfolio, job application, or technical interview.
+The platform uses RabbitMQ for asynchronous communication to avoid blocking the main API on slow or unreliable external systems.
 
-It reflects not only development capability, but also system thinking, architectural awareness, and the ability to build products that solve real-world problems.
+### Example flow
+- appointment is created
+- event is published to RabbitMQ
+- notification consumer receives the message
+- message is routed to the appropriate channel
+- SMS, email, or push delivery is performed asynchronously
+
+This pattern keeps the core application responsive and allows message retries and audit logging without degrading user-facing API performance.
 
 ---
 
-## Future growth
+## Real-time consultation flow
 
-Potential next steps include:
+The platform enables real-time consultation using WebRTC, with a signaling server coordinating connection setup.
 
-- expanding analytics and reporting dashboards
-- improving triage accuracy with richer AI models
-- adding multilingual support for local healthcare contexts
-- enhancing compliance and security controls
-- setting up CI/CD and deployment automation
+### Flow
+1. patient and provider start a consultation session
+2. backend creates or validates a consultation room
+3. both users connect to the signaling server using JWT-authenticated Socket.IO clients
+4. signaling server relays offers, answers, and ICE candidates between peers
+5. direct peer-to-peer media connection is established
+6. consultation status is updated in the backend when completed
+
+This architecture keeps media traffic decentralized while still providing a reliable connection orchestration layer.
+
+---
+
+## Deployment architecture
+
+The project is containerized with Docker Compose and includes separate services for each major application concern.
+
+### Services in deployment
+- `shcp-frontend`
+- `shcp-api`
+- `shcp-ai`
+- `shcp-signaling`
+- `shcp-db`
+- `shcp-redis`
+- `shcp-rabbitmq`
+- `shcp-notifications`
+- `shcp-coturn`
+
+### Why this matters
+This deployment strategy demonstrates a production-oriented approach to service separation and environment orchestration, which is highly relevant for engineering interviews and system design discussions.
+
+---
+
+## Tech decision rationale
+
+### Why Spring Boot?
+Spring Boot provides a strong foundation for enterprise application development, including REST APIs, security, data persistence, and modular service organization.
+
+### Why Python for AI?
+Python is highly effective for NLP and machine learning workflows, especially for symptom analysis, language processing, and AI-driven inference.
+
+### Why RabbitMQ?
+RabbitMQ decouples critical business actions from slower external notification systems and allows effective retry and queue-based processing.
+
+### Why Redis?
+Redis is used for fast, lightweight state management such as JWT refresh validation, OTP storage, rate limiting, and session-related support.
+
+### Why WebRTC?
+WebRTC enables peer-to-peer video communication with minimal server-side media processing, which makes it appropriate for real-time healthcare consultations.
+
+---
+
+## Business impact
+
+The project is designed to solve a real-world healthcare problem rather than just demonstrate a technology stack. It supports a digital care workflow that can improve:
+
+- patient access to medical services
+- workflow efficiency for clinics and providers
+- response time for urgent symptoms
+- communication reliability between stakeholders
+- operational monitoring and healthcare service management
+
+---
+
+## Future improvements
+
+- improve AI triage model accuracy with larger clinical datasets
+- add more granular analytics and dashboarding
+- expand multi-language support
+- strengthen compliance and audit workflows
+- add CI/CD pipelines and automated deployment checks
+- improve observability with centralized logging and monitoring
 
 ---
 
 ## Summary
 
-SHCP is a healthcare technology platform that brings together modern software engineering, AI-driven clinical support, and real-time communication in a single product. It showcases the ability to build scalable systems with meaningful user value, which is highly relevant for software and product-focused career opportunities.
+SHCP is a healthcare platform built to demonstrate practical software engineering in a complex domain. It combines frontend development, backend architecture, data modeling, AI integration, security, message-driven processing, real-time communication, and deployment orchestration in a single cohesive system.
+
+The project is strong for technical interviews and portfolio review because it showcases not only product thinking, but also engineering depth across architecture, infrastructure, and system design.
