@@ -1,80 +1,88 @@
 # SHCP - Smart Health Consultation Platform
 
-A full-stack telemedicine platform built to improve healthcare access by connecting patients, providers, and administrators through a digital clinical workflow. The system supports appointment booking, AI-assisted symptom triage, consultation management, prescription workflows, real-time video communication, and notification delivery.
+A full-stack telemedicine and healthcare management platform designed to improve access to healthcare through digital consultation workflows. SHCP connects patients, providers, and administrators in a single system that supports appointment booking, remote consultation, AI-assisted symptom triage, prescription management, and automated notifications.
 
-This project was developed to demonstrate a modern healthcare application built with a modular backend, a responsive frontend, AI-driven clinical support, and a scalable multi-service architecture.
-
----
-
-## Why this project matters
-
-Healthcare services often face delays, fragmented communication, and limited digital access. SHCP addresses this by creating a unified platform where:
-
-- patients can book appointments and receive remote guidance
-- providers can manage schedules and consultations digitally
-- administrators can oversee operations and analytics
-- AI can assist in triaging symptoms and prioritizing urgency
-- notifications and reminders keep users informed in real time
-
-The solution is designed to improve patient engagement, streamline clinic workflows, and support remote care delivery.
+The platform was built to demonstrate professional software engineering practices in a healthcare context, combining a modern frontend, a modular backend, multi-service architecture, and secure data handling.
 
 ---
 
-## Key capabilities
+## Project vision
 
-### Patient experience
-- secure sign-up and login
+Healthcare delivery is often slowed by fragmented communication, delayed access to providers, and inefficient manual workflows. SHCP addresses these challenges by creating a unified digital healthcare platform that streamlines patient care and operational coordination.
+
+The solution is designed to:
+
+- simplify appointment booking and scheduling
+- enable remote consultation between patients and providers
+- support AI-based urgency assessment for symptom reports
+- centralize patient records and prescriptions
+- improve patient engagement through reminders and notifications
+- provide a scalable architecture for real-world healthcare systems
+
+---
+
+## Core features
+
+### Patient features
+- secure registration and login
 - profile management
-- provider browsing and availability lookup
-- appointment booking and reminders
+- provider search and availability view
+- appointment booking and scheduling
 - AI-powered symptom analysis and urgency detection
-- access to consultation history and digital prescriptions
+- consultation history and digital medical records
+- prescription access and follow-up reminders
 
-### Provider workflow
-- provider availability management
+### Provider features
+- provider profile and availability management
 - appointment review and confirmation
-- consultation initiation and completion
-- online consultation coordination
+- consultation lifecycle management
 - prescription issuance
-- patient record and history review
+- patient history review and clinical workflow support
+- digital communication with patients during consultations
 
-### Administrative operations
+### Administrative features
 - user and role management
-- analytics and platform monitoring
-- operational visibility across healthcare processes
+- system monitoring and operational oversight
+- analytics and reporting support
+- healthcare workflow visibility across the platform
 
-### Real-time and messaging features
+### Platform features
+- JWT-based authentication and authorization
 - WebRTC-based video consultation setup
-- real-time signaling between users
-- SMS, email, and push notifications
-- async event-driven processing via messaging infrastructure
+- real-time signaling via Socket.IO
+- notification delivery through SMS, email, and push channels
+- event-driven communication with RabbitMQ
+- Docker-based deployment and service orchestration
 
 ---
 
-## Architecture overview
+## Architecture
 
-SHCP uses a hybrid architecture built for scalability and modularity:
+SHCP follows a hybrid architecture that combines a modular monolith with independent supporting services.
 
-- Core business logic in a Java Spring Boot application
-- AI symptom analysis in a Python Flask microservice
-- Real-time communication in a Node.js signaling server
-- Messaging and notification processing with RabbitMQ and Spring Boot consumers
-- Shared PostgreSQL database for transactional data
-- Redis for auth/session-related support, OTP, and rate limiting
-- Docker Compose for deployment and orchestration
+### Components
+- Core backend: Java + Spring Boot
+- Frontend: React + Vite
+- AI service: Python + Flask
+- Real-time signaling: Node.js + Socket.IO
+- Database: PostgreSQL
+- Cache and token storage: Redis
+- Message broker: RabbitMQ
+- Deployment: Docker Compose
 
-### High-level system flow
+### High-level architecture
 
 ```text
 React Frontend
       |
       v
 Spring Boot Core API
-   |-- Auth & Users
+   |-- Authentication
+   |-- Users & Roles
    |-- Appointments
    |-- Consultations
-   |-- Symptom Analysis
-   |-- EHR & Prescriptions
+   |-- Symptoms & EHR
+   |-- Prescriptions
    |-- Notifications
    |
    +--> Python AI Service
@@ -82,10 +90,12 @@ Spring Boot Core API
    +--> RabbitMQ
             |
             v
-      Notification Consumer
+   Notification Consumer
             |
             +--> SMS / Email / Push
 ```
+
+This design decouples business logic, AI processing, real-time communication, and notifications while preserving a shared data layer and centralized user management.
 
 ---
 
@@ -104,10 +114,10 @@ Spring Boot Core API
 - Spring Boot 3.x
 - Spring Security
 - Spring Data JPA / Hibernate
-- PostgreSQL
-- JWT authentication
+- PostgreSQL JDBC
+- JWT
 
-### AI and data processing
+### AI and analytics
 - Python
 - Flask
 - spaCy
@@ -116,74 +126,77 @@ Spring Boot Core API
 
 ### Real-time communication
 - Node.js
+- Express
 - Socket.IO
 - WebRTC
 
 ### Messaging and infrastructure
-- RabbitMQ
 - Redis
+- RabbitMQ
 - Docker
 - Docker Compose
 - PostgreSQL 15
 
 ---
 
-## Database design
+## Data model
 
-The application uses PostgreSQL and follows a structured, role-based healthcare data model.
+The project uses PostgreSQL with a role-based healthcare data model.
 
-### Core tables
-- `users`: shared identity and authentication table
-- `patients`: patient-specific profile information
-- `providers`: healthcare provider profile and specialization data
-- `admins`: admin access and platform management data
-- `availability`: provider time slots and booking windows
-- `appointments`: booking and scheduling records
-- `consultations`: consultation details and lifecycle status
-- `prescriptions`: digital prescriptions and medication records
-- `symptom_reports`: AI analysis submissions and urgency outcomes
-- `health_records`: patient medical history and clinical data
-- `notifications`: delivery logs and audit trails
+### Key entities
+- `users` — shared identity and authentication data
+- `patients` — patient profile and record information
+- `providers` — medical provider profile and specialization data
+- `admins` — administrative user records
+- `availability` — provider schedule/time slots
+- `appointments` — patient-provider booking records
+- `consultations` — consultation session details
+- `prescriptions` — digital prescriptions issued after consultation
+- `symptom_reports` — symptom input and AI assessment results
+- `health_records` — patient medical history and related structured data
+- `notifications` — delivery activity and message audit log
 
 ### Design principles
-- shared user identity across roles
-- one-to-one role extension model
-- strong scheduling and double-booking protections
-- JSONB for flexible healthcare-related records
+- shared identity model across user roles
+- role-based data extension using one-to-one relationships
+- strong appointment scheduling controls and double-booking protection
+- JSONB for flexible healthcare data structures
 - event-driven notification processing
 
 ---
 
 ## Security and reliability
 
-The project incorporates important production-style engineering practices:
+The platform incorporates production-oriented engineering practices to support secure operation:
 
 - BCrypt password hashing
-- JWT-based authentication and refresh token rotation
-- Redis-backed token validation and rate limiting
-- role-based access control at the API layer
-- environment-based secrets and Docker secret handling
-- health checks and service orchestration through Docker Compose
+- JWT-based authentication and token rotation
+- Redis-backed refresh token and rate-limit enforcement
+- role-based access control
+- environment-based secret management
+- health checks for running services
+- Docker Compose orchestration for scalable local deployment
 
 ---
 
-## What this project demonstrates
+## Why this project is relevant for jobs
 
-This repository showcases the ability to build and integrate:
+SHCP is a strong example of a full-stack software solution that combines product thinking, backend engineering, AI integration, and systems design. It demonstrates practical skills in:
 
-- a resilient multi-service backend architecture
-- a modern frontend application with a user-centered workflow
-- AI-assisted healthcare decision support
-- event-driven processing and async communication
-- secure role-based access control
-- operational infrastructure using Docker and cloud-ready services
+- building modular and maintainable backend services
+- integrating frontend and backend systems
+- developing real-time communication features
+- implementing secure authentication and authorization
+- working with event-driven architectures
+- deploying multi-service applications with Docker
+- designing domain-driven healthcare workflows
 
-It is especially relevant for roles involving:
+This makes the project highly relevant for roles in:
 
 - software engineering
-- backend development
-- full-stack engineering
-- cloud and infrastructure work
+- full-stack development
+- backend engineering
+- cloud and infrastructure
 - AI-integrated product development
 - healthcare technology systems
 
@@ -213,7 +226,7 @@ shcp/
 
 ---
 
-## Running locally
+## Local setup
 
 ### Prerequisites
 - Docker Desktop
@@ -222,14 +235,18 @@ shcp/
 - Python 3.11
 - Node.js
 
-### Setup
-```bash
-cp .env.example .env
-```
+### Environment configuration
+Create a `.env` file based on `.env.example` and configure the necessary values for:
 
-Then configure the required environment variables, including database, JWT, Redis, RabbitMQ, email credentials, and Firebase credentials.
+- database credentials
+- JWT secret
+- Redis password
+- RabbitMQ password
+- email credentials
+- Firebase credentials
+- TURN server configuration
 
-### Start the platform
+### Run the project
 ```bash
 docker compose up --build -d
 ```
@@ -239,7 +256,7 @@ docker compose up --build -d
 docker compose ps
 ```
 
-### Stop the platform
+### Stop the project
 ```bash
 docker compose down
 ```
@@ -259,24 +276,24 @@ docker compose down
 
 ## Project impact
 
-SHCP is a strong example of a production-style application that combines healthcare workflows, modern software engineering, and AI decision support in a single platform. It reflects practical software design decisions such as modularity, service isolation, asynchronous messaging, secure authentication, and scalable infrastructure.
+SHCP demonstrates a realistic healthcare platform built with modern engineering practices and multi-service architecture. It combines patient-centered functionality with strong technical implementation, making it a compelling project to present in a portfolio, job application, or technical interview.
 
-This project is well suited for demonstrating technical depth, product thinking, and systems design on a portfolio or during interviews.
+It reflects not only development capability, but also system thinking, architectural awareness, and the ability to build products that solve real-world problems.
 
 ---
 
-## Future improvements
+## Future growth
 
-- expand analytics and reporting dashboards
-- improve AI triage models with clinical validation
-- add multi-language patient support
-- integrate stronger medical workflows and compliance controls
-- add deployment automation and CI/CD pipelines
+Potential next steps include:
+
+- expanding analytics and reporting dashboards
+- improving triage accuracy with richer AI models
+- adding multilingual support for local healthcare contexts
+- enhancing compliance and security controls
+- setting up CI/CD and deployment automation
 
 ---
 
 ## Summary
 
-SHCP is more than a demo project; it is a healthcare platform concept built to solve real operational challenges in digital care delivery. It combines frontend engineering, backend systems, AI integration, real-time communication, and cloud-style infrastructure in one cohesive solution.
-
-The project was designed to reflect professional engineering practices and to communicate strong product thinking for software and technology roles.
+SHCP is a healthcare technology platform that brings together modern software engineering, AI-driven clinical support, and real-time communication in a single product. It showcases the ability to build scalable systems with meaningful user value, which is highly relevant for software and product-focused career opportunities.
